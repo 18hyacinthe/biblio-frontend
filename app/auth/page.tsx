@@ -1,80 +1,45 @@
 "use client"
 
-import type React from "react"
-
 import { useState } from "react"
+import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
-import { Alert, AlertDescription } from "@/components/ui/alert"
-import { BookOpen, User, Shield, AlertCircle } from "lucide-react"
-import { useRouter } from "next/navigation"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useAuth } from "@/lib/auth-context"
+import { BookOpen, Mail, Lock, User, IdCard, GraduationCap } from "lucide-react"
 
 export default function AuthPage() {
-  const [userType, setUserType] = useState("")
-  const [showLoginForm, setShowLoginForm] = useState(false)
-  const [showRegisterForm, setShowRegisterForm] = useState(false)
-  const [loginData, setLoginData] = useState({ email: "", password: "" })
+  const [isLoading, setIsLoading] = useState(false)
+  const [activeTab, setActiveTab] = useState("login")
+  const { login, register } = useAuth()
+  const router = useRouter()
+
+  // États pour la connexion
+  const [loginData, setLoginData] = useState({
+    email: "",
+    password: ""
+  })
+
+  // États pour l'inscription
   const [registerData, setRegisterData] = useState({
     name: "",
     email: "",
     password: "",
     studentId: "",
-    specialization: "",
+    specialization: ""
   })
-  const [error, setError] = useState("")
-  const [isLoading, setIsLoading] = useState(false)
-
-  const router = useRouter()
-  const { login } = useAuth()
-
-  const handleUserTypeChoice = () => {
-    if (!userType) {
-      setError("Veuillez choisir votre type d'utilisateur")
-      return
-    }
-    setError("")
-    if (userType === "admin") {
-      setShowLoginForm(true)
-    } else {
-      // Pour les étudiants, on peut proposer connexion ou inscription
-      setShowLoginForm(true)
-    }
-  }
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsLoading(true)
-    setError("")
 
     try {
-      // Simulation de connexion
-      if (userType === "admin" && loginData.email === "admin@2ie-edu.org" && loginData.password === "admin123") {
-        login({
-          id: "1",
-          name: "Administrateur CDI",
-          email: "admin@2ie-edu.org",
-          role: "admin",
-        })
-        router.push("/")
-      } else if (userType === "student" && loginData.email && loginData.password) {
-        login({
-          id: "2",
-          name: "Étudiant 2iE",
-          email: loginData.email,
-          role: "student",
-          studentId: "2iE2024001",
-        })
-        router.push("/")
-      } else {
-        setError("Identifiants invalides")
-      }
+      await login(loginData.email, loginData.password)
+      router.push("/student/dashboard")
     } catch (error) {
-      setError("Erreur de connexion")
+      console.error("Erreur de connexion:", error)
     } finally {
       setIsLoading(false)
     }
@@ -83,295 +48,212 @@ export default function AuthPage() {
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsLoading(true)
-    setError("")
 
     try {
-      if (registerData.name && registerData.email && registerData.password && registerData.studentId) {
-        login({
-          id: "3",
-          name: registerData.name,
-          email: registerData.email,
-          role: "student",
-          studentId: registerData.studentId,
-        })
-        router.push("/")
-      } else {
-        setError("Veuillez remplir tous les champs")
-      }
+      await register({
+        name: registerData.name,
+        email: registerData.email,
+        password: registerData.password,
+        studentId: registerData.studentId,
+        specialization: registerData.specialization
+      })
+      // Rediriger vers la page de connexion après inscription réussie
+      alert("Inscription réussie ! Veuillez vous connecter.")
+      // Réinitialiser le formulaire et basculer vers l'onglet login
+      setRegisterData({
+        name: "",
+        email: "",
+        password: "",
+        studentId: "",
+        specialization: ""
+      })
+      // Basculer vers l'onglet login
+      setActiveTab("login")
     } catch (error) {
-      setError("Erreur lors de l'inscription")
+      console.error("Erreur d'inscription:", error)
     } finally {
       setIsLoading(false)
     }
   }
 
-  const resetForms = () => {
-    setShowLoginForm(false)
-    setShowRegisterForm(false)
-    setUserType("")
-    setError("")
-    setLoginData({ email: "", password: "" })
-    setRegisterData({ name: "", email: "", password: "", studentId: "", specialization: "" })
-  }
-
   return (
-    <div className="min-h-screen bg-gradient-to-br from-green-50 via-yellow-50 to-green-100 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
       <div className="w-full max-w-md">
         {/* Logo et titre */}
         <div className="text-center mb-8">
-          <div className="flex justify-center mb-4">
-            <div className="relative">
-              <BookOpen className="h-16 w-16 text-green-600" />
-              <div className="absolute -top-2 -right-2 h-6 w-6 bg-yellow-400 rounded-full flex items-center justify-center">
-                <div className="h-3 w-3 bg-green-500 rounded-full"></div>
-              </div>
-            </div>
+          <div className="inline-flex items-center justify-center w-16 h-16 bg-blue-600 rounded-full mb-4">
+            <BookOpen className="h-8 w-8 text-white" />
           </div>
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">Choix de Connexion</h1>
-          <p className="text-gray-600">Bibliothèque 2iE</p>
+          <h1 className="text-3xl font-bold text-gray-900">Bibliothèque 2iE</h1>
+          <p className="text-gray-600 mt-2">Système de gestion des emprunts</p>
         </div>
 
-        {!showLoginForm && !showRegisterForm ? (
-          /* Choix du type d'utilisateur */
-          <Card className="border-green-200 shadow-lg">
-            <CardHeader>
-              <CardTitle className="text-center text-green-700">Sélectionnez votre profil</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              {error && (
-                <Alert className="border-red-300">
-                  <AlertCircle className="h-4 w-4 text-red-600" />
-                  <AlertDescription className="text-red-800">{error}</AlertDescription>
-                </Alert>
-              )}
+        <Card className="shadow-lg">
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="login">Connexion</TabsTrigger>
+              <TabsTrigger value="register">Inscription</TabsTrigger>
+            </TabsList>
 
-              <RadioGroup value={userType} onValueChange={setUserType} className="space-y-4">
-                <div className="flex items-center space-x-3 p-4 border border-gray-200 rounded-lg hover:bg-green-50 transition-colors">
-                  <RadioGroupItem value="student" id="student" />
-                  <Label htmlFor="student" className="flex items-center space-x-3 cursor-pointer flex-1">
-                    <User className="h-5 w-5 text-blue-600" />
-                    <div>
-                      <p className="font-medium">Étudiant</p>
-                      <p className="text-sm text-gray-600">Accès aux ressources et emprunts</p>
+            {/* Onglet Connexion */}
+            <TabsContent value="login">
+              <CardHeader>
+                <CardTitle>Se connecter</CardTitle>
+                <CardDescription>
+                  Connectez-vous à votre compte étudiant
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <form onSubmit={handleLogin} className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="login-email">Email</Label>
+                    <div className="relative">
+                      <Mail className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                      <Input
+                        id="login-email"
+                        type="email"
+                        placeholder="votre.email@student.2ie-edu.org"
+                        className="pl-10"
+                        value={loginData.email}
+                        onChange={(e) => setLoginData(prev => ({ ...prev, email: e.target.value }))}
+                        required
+                      />
                     </div>
-                  </Label>
-                </div>
+                  </div>
 
-                <div className="flex items-center space-x-3 p-4 border border-gray-200 rounded-lg hover:bg-green-50 transition-colors">
-                  <RadioGroupItem value="admin" id="admin" />
-                  <Label htmlFor="admin" className="flex items-center space-x-3 cursor-pointer flex-1">
-                    <Shield className="h-5 w-5 text-red-600" />
-                    <div>
-                      <p className="font-medium">Administrateur</p>
-                      <p className="text-sm text-gray-600">Gestion de la bibliothèque</p>
+                  <div className="space-y-2">
+                    <Label htmlFor="login-password">Mot de passe</Label>
+                    <div className="relative">
+                      <Lock className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                      <Input
+                        id="login-password"
+                        type="password"
+                        placeholder="••••••••"
+                        className="pl-10"
+                        value={loginData.password}
+                        onChange={(e) => setLoginData(prev => ({ ...prev, password: e.target.value }))}
+                        required
+                      />
                     </div>
-                  </Label>
-                </div>
-              </RadioGroup>
-
-              <Button onClick={handleUserTypeChoice} className="w-full bg-green-600 hover:bg-green-700 h-12 text-lg">
-                Choisir
-              </Button>
-            </CardContent>
-          </Card>
-        ) : showLoginForm ? (
-          /* Formulaire de connexion */
-          <Card className="border-green-200 shadow-lg">
-            <CardHeader>
-              <CardTitle className="text-center text-green-700">
-                Connexion {userType === "admin" ? "Administrateur" : "Étudiant"}
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <form onSubmit={handleLogin} className="space-y-4">
-                {error && (
-                  <Alert className="border-red-300">
-                    <AlertCircle className="h-4 w-4 text-red-600" />
-                    <AlertDescription className="text-red-800">{error}</AlertDescription>
-                  </Alert>
-                )}
-
-                <div className="space-y-2">
-                  <Label htmlFor="email">Email {userType === "admin" ? "" : "2iE"}</Label>
-                  <Input
-                    id="email"
-                    type="email"
-                    placeholder={userType === "admin" ? "admin@2ie-edu.org" : "votre.nom@2ie-edu.org"}
-                    value={loginData.email}
-                    onChange={(e) => setLoginData({ ...loginData, email: e.target.value })}
-                    required
-                    disabled={isLoading}
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="password">Mot de passe</Label>
-                  <Input
-                    id="password"
-                    type="password"
-                    value={loginData.password}
-                    onChange={(e) => setLoginData({ ...loginData, password: e.target.value })}
-                    required
-                    disabled={isLoading}
-                  />
-                </div>
-
-                <Button type="submit" className="w-full bg-green-600 hover:bg-green-700" disabled={isLoading}>
-                  {isLoading ? "Connexion..." : "Se connecter"}
-                </Button>
-
-                {userType === "admin" && (
-                  <div className="text-sm text-gray-600 space-y-1 p-3 bg-gray-50 rounded">
-                    <p>
-                      <strong>Compte test :</strong>
-                    </p>
-                    <p>Email: admin@2ie-edu.org</p>
-                    <p>Mot de passe: admin123</p>
                   </div>
-                )}
 
-                {userType === "student" && (
-                  <div className="text-center">
-                    <p className="text-sm text-gray-600 mb-2">Pas encore de compte ?</p>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={() => {
-                        setShowLoginForm(false)
-                        setShowRegisterForm(true)
-                      }}
-                      className="w-full border-green-300 text-green-700 hover:bg-green-50"
-                    >
-                      Créer un compte étudiant
-                    </Button>
-                  </div>
-                )}
-
-                <Button
-                  type="button"
-                  variant="ghost"
-                  onClick={resetForms}
-                  className="w-full text-gray-600 hover:text-gray-800"
-                >
-                  ← Retour au choix
-                </Button>
-              </form>
-            </CardContent>
-          </Card>
-        ) : (
-          /* Formulaire d'inscription */
-          <Card className="border-green-200 shadow-lg">
-            <CardHeader>
-              <CardTitle className="text-center text-green-700">Inscription Étudiant</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <form onSubmit={handleRegister} className="space-y-4">
-                {error && (
-                  <Alert className="border-red-300">
-                    <AlertCircle className="h-4 w-4 text-red-600" />
-                    <AlertDescription className="text-red-800">{error}</AlertDescription>
-                  </Alert>
-                )}
-
-                <div className="space-y-2">
-                  <Label htmlFor="name">Nom complet</Label>
-                  <Input
-                    id="name"
-                    placeholder="Prénom NOM"
-                    value={registerData.name}
-                    onChange={(e) => setRegisterData({ ...registerData, name: e.target.value })}
-                    required
-                    disabled={isLoading}
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="studentId">Numéro étudiant 2iE</Label>
-                  <Input
-                    id="studentId"
-                    placeholder="2iE2024001"
-                    value={registerData.studentId}
-                    onChange={(e) => setRegisterData({ ...registerData, studentId: e.target.value })}
-                    required
-                    disabled={isLoading}
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="specialization">Spécialisation</Label>
-                  <Select
-                    value={registerData.specialization}
-                    onValueChange={(value) => setRegisterData({ ...registerData, specialization: value })}
+                  <Button 
+                    type="submit" 
+                    className="w-full"
                     disabled={isLoading}
                   >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Choisir une spécialisation" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="Génie Civil">Génie Civil</SelectItem>
-                      <SelectItem value="Génie Électrique">Génie Électrique</SelectItem>
-                      <SelectItem value="Informatique">Informatique</SelectItem>
-                      <SelectItem value="Management">Management</SelectItem>
-                      <SelectItem value="Environnement">Environnement</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="registerEmail">Email 2iE</Label>
-                  <Input
-                    id="registerEmail"
-                    type="email"
-                    placeholder="prenom.nom@2ie-edu.org"
-                    value={registerData.email}
-                    onChange={(e) => setRegisterData({ ...registerData, email: e.target.value })}
-                    required
-                    disabled={isLoading}
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="registerPassword">Mot de passe</Label>
-                  <Input
-                    id="registerPassword"
-                    type="password"
-                    value={registerData.password}
-                    onChange={(e) => setRegisterData({ ...registerData, password: e.target.value })}
-                    required
-                    disabled={isLoading}
-                  />
-                </div>
-
-                <Button type="submit" className="w-full bg-green-600 hover:bg-green-700" disabled={isLoading}>
-                  {isLoading ? "Inscription..." : "Créer mon compte"}
-                </Button>
-
-                <div className="text-center">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => {
-                      setShowRegisterForm(false)
-                      setShowLoginForm(true)
-                    }}
-                    className="w-full border-green-300 text-green-700 hover:bg-green-50"
-                  >
-                    Déjà un compte ? Se connecter
+                    {isLoading ? "Connexion..." : "Se connecter"}
                   </Button>
-                </div>
+                </form>
+              </CardContent>
+            </TabsContent>
 
-                <Button
-                  type="button"
-                  variant="ghost"
-                  onClick={resetForms}
-                  className="w-full text-gray-600 hover:text-gray-800"
-                >
-                  ← Retour au choix
-                </Button>
-              </form>
-            </CardContent>
-          </Card>
-        )}
+            {/* Onglet Inscription */}
+            <TabsContent value="register">
+              <CardHeader>
+                <CardTitle>S&apos;inscrire</CardTitle>
+                <CardDescription>
+                  Créez votre compte étudiant
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <form onSubmit={handleRegister} className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="register-name">Nom complet</Label>
+                    <div className="relative">
+                      <User className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                      <Input
+                        id="register-name"
+                        type="text"
+                        placeholder="Jean Ouédraogo"
+                        className="pl-10"
+                        value={registerData.name}
+                        onChange={(e) => setRegisterData(prev => ({ ...prev, name: e.target.value }))}
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="register-email">Email</Label>
+                    <div className="relative">
+                      <Mail className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                      <Input
+                        id="register-email"
+                        type="email"
+                        placeholder="j.ouedraogo@student.2ie-edu.org"
+                        className="pl-10"
+                        value={registerData.email}
+                        onChange={(e) => setRegisterData(prev => ({ ...prev, email: e.target.value }))}
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="register-password">Mot de passe</Label>
+                    <div className="relative">
+                      <Lock className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                      <Input
+                        id="register-password"
+                        type="password"
+                        placeholder="••••••••"
+                        className="pl-10"
+                        value={registerData.password}
+                        onChange={(e) => setRegisterData(prev => ({ ...prev, password: e.target.value }))}
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="register-student-id">Numéro étudiant</Label>
+                    <div className="relative">
+                      <IdCard className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                      <Input
+                        id="register-student-id"
+                        type="text"
+                        placeholder="2IE2024001"
+                        className="pl-10"
+                        value={registerData.studentId}
+                        onChange={(e) => setRegisterData(prev => ({ ...prev, studentId: e.target.value }))}
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="register-specialization">Spécialisation</Label>
+                    <div className="relative">
+                      <GraduationCap className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                      <Input
+                        id="register-specialization"
+                        type="text"
+                        placeholder="Génie Informatique"
+                        className="pl-10"
+                        value={registerData.specialization}
+                        onChange={(e) => setRegisterData(prev => ({ ...prev, specialization: e.target.value }))}
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  <Button 
+                    type="submit" 
+                    className="w-full"
+                    disabled={isLoading}
+                  >
+                    {isLoading ? "Inscription..." : "S'inscrire"}
+                  </Button>
+                </form>
+              </CardContent>
+            </TabsContent>
+          </Tabs>
+        </Card>
+
+        <div className="text-center mt-6 text-sm text-gray-600">
+          <p>© 2024 Institut International d&apos;Ingénierie de l&apos;Eau et de l&apos;Environnement</p>
+        </div>
       </div>
     </div>
   )

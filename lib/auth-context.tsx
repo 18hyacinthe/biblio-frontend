@@ -2,6 +2,7 @@
 
 import type React from "react"
 import { createContext, useContext, useState, useEffect } from "react"
+import { authAPI } from "./api"
 
 interface User {
   id: string
@@ -9,12 +10,20 @@ interface User {
   email: string
   role: "student" | "admin"
   studentId?: string
+  specialization?: string
 }
 
 interface AuthContextType {
   user: User | null
-  login: (user: User) => void
-  logout: () => void
+  login: (email: string, password: string) => Promise<void>
+  register: (userData: {
+    name: string;
+    email: string;
+    password: string;
+    studentId: string;
+    specialization: string;
+  }) => Promise<void>
+  logout: () => Promise<void>
   isLoading: boolean
 }
 
@@ -25,30 +34,80 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
-    // Vérifier si un utilisateur est déjà connecté
-    const savedUser = localStorage.getItem("user")
-    if (savedUser) {
-      try {
-        setUser(JSON.parse(savedUser))
-      } catch (error) {
-        console.error("Erreur lors du parsing de l'utilisateur sauvegardé:", error)
-        localStorage.removeItem("user")
-      }
-    }
-    setIsLoading(false)
+    // Vérifier si l'utilisateur est déjà connecté au chargement
+    checkAuthStatus()
   }, [])
 
-  const login = (userData: User) => {
-    setUser(userData)
-    localStorage.setItem("user", JSON.stringify(userData))
+  const checkAuthStatus = async () => {
+    const token = localStorage.getItem('token')
+    
+    if (!token) {
+      setIsLoading(false)
+      return
+    }
+
+    try {
+      const response = await authAPI.me()
+      if (response.success && response.user) {
+        setUser(response.user)
+      } else {
+        localStorage.removeItem('token')
+      }
+    } catch (error) {
+      console.error('Erreur vérification auth:', error)
+      localStorage.removeItem('token')
+    } finally {
+      setIsLoading(false)
+    }
   }
 
-  const logout = () => {
-    setUser(null)
-    localStorage.removeItem("user")
+  const login = async (email: string, password: string) => {
+    try {
+      const response = await authAPI.login(email, password)
+      if (response.success && response.user) {
+        setUser(response.user)
+      } else {
+        throw new Error(response.message || 'Erreur de connexion')
+      }
+    } catch (error) {
+      throw error
+    }
   }
 
-  return <AuthContext.Provider value={{ user, login, logout, isLoading }}>{children}</AuthContext.Provider>
+  const register = async (userData: {
+    name: string;
+    email: string;
+    password: string;
+    studentId: string;
+    specialization: string;
+  }) => {
+    try {
+      const response = await authAPI.register(userData)
+      if (response.success && response.user) {
+        setUser(response.user)
+      } else {
+        throw new Error(response.message || 'Erreur d\'inscription')
+      }
+    } catch (error) {
+      throw error
+    }
+  }
+
+  const logout = async () => {
+    try {
+      await authAPI.logout()
+    } catch (error) {
+      console.error('Erreur déconnexion:', error)
+    } finally {
+      setUser(null)
+    }
+  }
+
+  return (
+    <AuthContext.Provider value={{ user, login, register, logout, isLoading }}>
+      {children}
+    </AuthContext.Provider>
+  )
 }
 
 export function useAuth() {

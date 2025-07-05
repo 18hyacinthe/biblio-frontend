@@ -6,87 +6,143 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Textarea } from "@/components/ui/textarea"
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { Label } from "@/components/ui/label"
+import { Alert, AlertDescription } from "@/components/ui/alert"
 import {
   BookOpen,
   Search,
-  Star,
   Calendar,
   User,
   LogOut,
   MapPin,
-  Globe,
-  FileText,
-  MessageSquare,
   ArrowLeft,
+  AlertCircle,
+  Loader2,
 } from "lucide-react"
 import { useAuth } from "@/lib/auth-context"
 import { useRouter } from "next/navigation"
-import { books, loans, specializations, documentTypes, locations, type Book, type Loan } from "@/lib/data"
+import { booksAPI, loansAPI } from "@/lib/api"
+
+// Types
+interface Book {
+  id: string
+  title: string
+  author: string
+  publisher?: string
+  isbn?: string
+  publication_year?: number
+  description?: string
+  category?: string
+  location: string
+  total_copies: number
+  available_copies: number
+  created_at?: string
+  updated_at?: string
+}
+
+interface Loan {
+  id: string
+  user_id: string
+  book_id: string
+  loan_date: string
+  due_date: string
+  return_date?: string
+  status: "active" | "returned" | "overdue"
+  created_at?: string
+  updated_at?: string
+  // Informations du livre jointes
+  book_title?: string
+  book_author?: string
+}
+
+const categories = [
+  "Eau et Assainissement",
+  "Génie Civil et BTP",
+  "Énergies renouvelables",
+  "Environnement", 
+  "Mines et Géologie",
+  "Électromécanique",
+  "Informatique et Télécommunications",
+]
+
+const locations = [
+  { value: "kamboinse", label: "Bibliothèque Kamboinsé" },
+  { value: "ouaga", label: "Bibliothèque Ouaga" },
+]
 
 export default function StudentDashboard() {
   const { user, logout } = useAuth()
   const router = useRouter()
+
+  // États pour les données
+  const [books, setBooks] = useState<Book[]>([])
+  const [loans, setLoans] = useState<Loan[]>([])
+  const [filteredBooks, setFilteredBooks] = useState<Book[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState("")
+
+  // États pour les filtres
   const [searchTerm, setSearchTerm] = useState("")
-  const [genreFilter, setGenreFilter] = useState("all")
+  const [categoryFilter, setCategoryFilter] = useState("all")
   const [locationFilter, setLocationFilter] = useState("all")
-  const [docTypeFilter, setDocTypeFilter] = useState("all")
-  const [filteredBooks, setFilteredBooks] = useState<Book[]>(books)
-  const [userLoans, setUserLoans] = useState<Loan[]>([])
   const [activeTab, setActiveTab] = useState("catalogue")
 
-  // États pour la notation
-  const [selectedBook, setSelectedBook] = useState<Book | null>(null)
-  const [rating, setRating] = useState(0)
-  const [comment, setComment] = useState("")
-  const [isRatingDialogOpen, setIsRatingDialogOpen] = useState(false)
+  // États pour les actions
+  const [borrowingBook, setBorrowingBook] = useState<string | null>(null)
+  const [returningLoan, setReturningLoan] = useState<string | null>(null)
 
-  // Livres que l'étudiant peut noter (livres qu'il a empruntés)
-  const [booksToRate, setBooksToRate] = useState<Book[]>([])
-
+  // Vérification de l'utilisateur
   useEffect(() => {
     if (!user || user.role !== "student") {
-      router.push("/")
+      router.push("/auth")
       return
     }
+  }, [user, router])
 
-    // Filtrer les livres
+  // Chargement des données
+  useEffect(() => {
+    loadData()
+  }, [])
+
+  // Filtrage des livres
+  useEffect(() => {
     let filtered = books.filter(
       (book) =>
         book.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
         book.author.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        book.specialization.toLowerCase().includes(searchTerm.toLowerCase()),
+        (book.category && book.category.toLowerCase().includes(searchTerm.toLowerCase())),
     )
 
-    if (genreFilter !== "all") {
-      filtered = filtered.filter((book) => book.specialization === genreFilter)
+    if (categoryFilter !== "all") {
+      filtered = filtered.filter((book) => book.category === categoryFilter)
     }
 
     if (locationFilter !== "all") {
       filtered = filtered.filter((book) => book.location === locationFilter)
     }
 
-    if (docTypeFilter !== "all") {
-      filtered = filtered.filter((book) => book.documentType === docTypeFilter)
-    }
-
     setFilteredBooks(filtered)
+  }, [searchTerm, categoryFilter, locationFilter, books])
 
-    // Récupérer les emprunts de l'utilisateur
-    const userLoansList = loans.filter((loan) => loan.userId === user.id)
-    setUserLoans(userLoansList)
+  const loadData = async () => {
+    try {
+      setLoading(true)
+      setError("")
 
-    // Livres que l'étudiant peut noter (simulation - livres qu'il a déjà empruntés)
-    const booksUserCanRate = books.filter(
-      (book) =>
-        userLoansList.some((loan) => loan.bookId === book.id) ||
-        // Ajouter quelques livres pour la démonstration
-        ["1", "2", "3", "4", "5"].includes(book.id),
-    )
-    setBooksToRate(booksUserCanRate)
-  }, [searchTerm, genreFilter, locationFilter, docTypeFilter, user, router])
+      // Charger les livres et les emprunts en parallèle
+      const [booksData, loansData] = await Promise.all([
+        booksAPI.getAll(),
+        loansAPI.getMy()
+      ])
+
+      setBooks(booksData)
+      setLoans(loansData)
+    } catch (error: any) {
+      console.error("Erreur lors du chargement des données:", error)
+      setError(error.message || "Erreur lors du chargement des données")
+    } finally {
+      setLoading(false)
+    }
+  }
 
   const handleLogout = () => {
     logout()
@@ -97,48 +153,44 @@ export default function StudentDashboard() {
     router.push("/")
   }
 
-  const handleBorrowBook = (bookId: string) => {
-    const book = books.find((b) => b.id === bookId)
-    if (book && book.availableCopies > 0) {
-      alert(`Livre "${book.title}" emprunté avec succès !`)
+  const handleBorrowBook = async (bookId: string) => {
+    try {
+      setBorrowingBook(bookId)
+      setError("")
+
+      await loansAPI.create(bookId)
+      
+      // Recharger les données
+      await loadData()
+      
+      // Message de succès (optionnel: vous pourriez utiliser un toast)
+      alert("Livre emprunté avec succès !")
+    } catch (error: any) {
+      console.error("Erreur lors de l'emprunt:", error)
+      setError(error.message || "Erreur lors de l'emprunt")
+    } finally {
+      setBorrowingBook(null)
     }
   }
 
-  const handleRateBook = (book: Book) => {
-    setSelectedBook(book)
-    setRating(0)
-    setComment("")
-    setIsRatingDialogOpen(true)
-  }
+  const handleReturnBook = async (loanId: string) => {
+    try {
+      setReturningLoan(loanId)
+      setError("")
 
-  const submitRating = () => {
-    if (selectedBook && rating > 0) {
-      alert(
-        `Merci pour votre évaluation !\n\nLivre: ${selectedBook.title}\nNote: ${rating}/5 étoiles\nCommentaire: ${comment || "Aucun commentaire"}`,
-      )
-      setIsRatingDialogOpen(false)
-      setSelectedBook(null)
-      setRating(0)
-      setComment("")
-    } else {
-      alert("Veuillez donner une note avant de valider.")
+      await loansAPI.return(loanId)
+      
+      // Recharger les données
+      await loadData()
+      
+      // Message de succès
+      alert("Livre retourné avec succès !")
+    } catch (error: any) {
+      console.error("Erreur lors du retour:", error)
+      setError(error.message || "Erreur lors du retour")
+    } finally {
+      setReturningLoan(null)
     }
-  }
-
-  const getDocumentTypeIcon = (type: string) => {
-    switch (type) {
-      case "document_electronique":
-        return <Globe className="h-4 w-4" />
-      case "multimedia":
-        return <FileText className="h-4 w-4" />
-      default:
-        return <BookOpen className="h-4 w-4" />
-    }
-  }
-
-  const getDocumentTypeLabel = (type: string) => {
-    const docType = documentTypes.find((dt) => dt.value === type)
-    return docType?.label || type
   }
 
   const getLocationLabel = (location: string) => {
@@ -146,425 +198,327 @@ export default function StudentDashboard() {
     return loc?.label || location
   }
 
-  const renderStars = (currentRating: number, onStarClick?: (star: number) => void) => {
+  const getStatusBadge = (status: string) => {
+    switch (status) {
+      case "active":
+        return <Badge variant="default">En cours</Badge>
+      case "returned":
+        return <Badge variant="secondary">Retourné</Badge>
+      case "overdue":
+        return <Badge variant="destructive">En retard</Badge>
+      default:
+        return <Badge variant="outline">{status}</Badge>
+    }
+  }
+
+  const isBookAvailable = (book: Book) => {
+    return book.available_copies > 0
+  }
+
+  const hasUserBorrowedBook = (bookId: string) => {
+    return loans.some(loan => loan.book_id === bookId && loan.status === "active")
+  }
+
+  if (!user || user.role !== "student") {
+    return null
+  }
+
+  if (loading) {
     return (
-      <div className="flex items-center space-x-1">
-        {[1, 2, 3, 4, 5].map((star) => (
-          <Star
-            key={star}
-            className={`h-5 w-5 cursor-pointer transition-colors ${
-              star <= currentRating ? "fill-yellow-400 text-yellow-400" : "text-gray-300 hover:text-yellow-400"
-            }`}
-            onClick={() => onStarClick && onStarClick(star)}
-          />
-        ))}
+      <div className="min-h-screen bg-gradient-to-br from-green-50 via-yellow-50 to-green-100 flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-green-600" />
+          <p className="text-gray-600">Chargement...</p>
+        </div>
       </div>
     )
   }
 
-  if (!user) return null
-
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gradient-to-br from-green-50 via-yellow-50 to-green-100">
       {/* Header */}
-      <header className="bg-white shadow-sm border-b">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-3">
-              <img src="/placeholder.svg?height=60&width=120" alt="Logo 2iE" className="h-16" />
-              <div>
-                <h1 className="text-2xl font-bold text-gray-900">Bibliothèque en ligne</h1>
-                <p className="text-sm text-gray-600">
-                  Institut International d'Ingénierie de l'Eau et de l'Environnement
-                </p>
-              </div>
-            </div>
+      <div className="bg-white shadow-sm border-b">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex justify-between items-center py-4">
             <div className="flex items-center space-x-4">
-              <Button variant="outline" size="sm" onClick={handleGoHome}>
+              <Button variant="ghost" size="sm" onClick={handleGoHome}>
                 <ArrowLeft className="h-4 w-4 mr-2" />
                 Accueil
               </Button>
               <div className="flex items-center space-x-2">
-                <User className="h-5 w-5 text-gray-600" />
-                <div className="text-right">
-                  <span className="text-sm font-medium block">{user.name}</span>
-                  <span className="text-xs text-gray-600">{user.studentId}</span>
-                </div>
+                <BookOpen className="h-6 w-6 text-green-600" />
+                <h1 className="text-xl font-semibold text-gray-900">Dashboard Étudiant</h1>
               </div>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleLogout}
-                className="border-red-300 text-red-700 hover:bg-red-50 bg-transparent"
-              >
+            </div>
+            <div className="flex items-center space-x-4">
+              <div className="flex items-center space-x-2">
+                <User className="h-4 w-4 text-gray-500" />
+                <span className="text-sm text-gray-700">{user.name}</span>
+              </div>
+              <Button variant="outline" size="sm" onClick={handleLogout}>
                 <LogOut className="h-4 w-4 mr-2" />
                 Déconnexion
               </Button>
             </div>
           </div>
         </div>
-      </header>
-
-      {/* Navigation par onglets */}
-      <div className="bg-white border-b">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex space-x-8">
-            <button
-              onClick={() => setActiveTab("catalogue")}
-              className={`py-4 px-1 border-b-2 font-medium text-sm ${
-                activeTab === "catalogue"
-                  ? "border-green-500 text-green-600"
-                  : "border-transparent text-gray-500 hover:text-gray-700"
-              }`}
-            >
-              Catalogue
-            </button>
-            <button
-              onClick={() => setActiveTab("emprunts")}
-              className={`py-4 px-1 border-b-2 font-medium text-sm ${
-                activeTab === "emprunts"
-                  ? "border-green-500 text-green-600"
-                  : "border-transparent text-gray-500 hover:text-gray-700"
-              }`}
-            >
-              Mes emprunts
-            </button>
-            <button
-              onClick={() => setActiveTab("notation")}
-              className={`py-4 px-1 border-b-2 font-medium text-sm ${
-                activeTab === "notation"
-                  ? "border-green-500 text-green-600"
-                  : "border-transparent text-gray-500 hover:text-gray-700"
-              }`}
-            >
-              Noter des livres
-            </button>
-          </div>
-        </div>
       </div>
 
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Statistiques utilisateur */}
-        <div className="grid md:grid-cols-4 gap-6 mb-8">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Emprunts actifs</CardTitle>
-              <BookOpen className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{userLoans.filter((l) => l.status === "active").length}</div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">En retard</CardTitle>
-              <Calendar className="h-4 w-4 text-red-600" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-red-600">
-                {userLoans.filter((l) => l.status === "overdue").length}
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total emprunts</CardTitle>
-              <Star className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{userLoans.length}</div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Livres à noter</CardTitle>
-              <MessageSquare className="h-4 w-4 text-yellow-600" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-yellow-600">{booksToRate.length}</div>
-            </CardContent>
-          </Card>
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {error && (
+          <Alert variant="destructive" className="mb-6">
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        )}
+
+        {/* Onglets */}
+        <div className="mb-6">
+          <div className="border-b border-gray-200">
+            <nav className="-mb-px flex space-x-8">
+              <button
+                onClick={() => setActiveTab("catalogue")}
+                className={`py-2 px-1 border-b-2 font-medium text-sm ${
+                  activeTab === "catalogue"
+                    ? "border-green-500 text-green-600"
+                    : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+                }`}
+              >
+                Catalogue des livres
+              </button>
+              <button
+                onClick={() => setActiveTab("emprunts")}
+                className={`py-2 px-1 border-b-2 font-medium text-sm ${
+                  activeTab === "emprunts"
+                    ? "border-green-500 text-green-600"
+                    : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+                }`}
+              >
+                Mes emprunts ({loans.filter(l => l.status === "active").length})
+              </button>
+            </nav>
+          </div>
         </div>
 
-        {/* Contenu selon l'onglet actif */}
-        {activeTab === "emprunts" && userLoans.length > 0 && (
-          <Card className="mb-8">
-            <CardHeader>
-              <CardTitle>Mes emprunts en cours</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {userLoans.map((loan) => (
-                  <div key={loan.id} className="flex items-center justify-between p-4 border rounded-lg">
-                    <div>
-                      <h4 className="font-medium">{loan.bookTitle}</h4>
-                      <div className="flex items-center space-x-4 mt-1">
-                        <p className="text-sm text-gray-600">
-                          Emprunté le {new Date(loan.loanDate).toLocaleDateString("fr-FR")}
-                        </p>
-                        <p className="text-sm text-gray-600">
-                          À rendre le {new Date(loan.dueDate).toLocaleDateString("fr-FR")}
-                        </p>
-                        <div className="flex items-center space-x-1">
-                          <MapPin className="h-3 w-3 text-gray-400" />
-                          <span className="text-xs text-gray-600">{getLocationLabel(loan.location)}</span>
-                        </div>
-                      </div>
-                    </div>
-                    <Badge variant={loan.status === "overdue" ? "destructive" : "default"}>
-                      {loan.status === "active" ? "En cours" : "En retard"}
-                    </Badge>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Section Notation */}
-        {activeTab === "notation" && (
-          <Card className="mb-8">
-            <CardHeader>
-              <CardTitle className="flex items-center space-x-2">
-                <MessageSquare className="h-5 w-5 text-yellow-600" />
-                <span>Noter et commenter des livres</span>
-              </CardTitle>
-              <CardDescription>
-                Partagez votre avis sur les livres que vous avez lus pour aider les autres étudiants
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {booksToRate.map((book) => (
-                  <Card key={book.id} className="border-yellow-200 hover:shadow-lg transition-shadow">
-                    <div className="aspect-[3/4] bg-gray-100 relative">
-                      <img
-                        src={book.coverUrl || "/placeholder.svg"}
-                        alt={book.title}
-                        className="w-full h-full object-cover rounded-t-lg"
-                      />
-                    </div>
-                    <CardContent className="p-4">
-                      <h3 className="font-semibold text-lg mb-1 line-clamp-2">{book.title}</h3>
-                      <p className="text-gray-600 text-sm mb-2">{book.author}</p>
-                      <div className="flex items-center justify-between mb-2">
-                        <Badge variant="secondary" className="text-xs bg-green-100 text-green-800">
-                          {book.specialization}
-                        </Badge>
-                        <div className="flex items-center space-x-1">
-                          <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
-                          <span className="text-sm">{book.rating}</span>
-                        </div>
-                      </div>
-                      <Badge variant="outline" className="text-xs border-green-300 text-green-700 mb-3">
-                        {getLocationLabel(book.location)}
-                      </Badge>
-                      <p className="text-sm text-gray-600 mb-4 line-clamp-2">{book.description}</p>
-                      <Button
-                        onClick={() => handleRateBook(book)}
-                        className="w-full bg-yellow-500 hover:bg-yellow-600 text-white"
-                        size="sm"
-                      >
-                        <MessageSquare className="h-4 w-4 mr-2" />
-                        Noter ce livre
-                      </Button>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-              {booksToRate.length === 0 && (
-                <div className="text-center py-8">
-                  <MessageSquare className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                  <p className="text-gray-500">Aucun livre à noter pour le moment.</p>
-                  <p className="text-sm text-gray-400 mt-2">
-                    Empruntez des livres pour pouvoir les noter et laisser des commentaires.
-                  </p>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Catalogue (onglet par défaut) */}
+        {/* Contenu des onglets */}
         {activeTab === "catalogue" && (
-          <Card className="mb-8">
-            <CardHeader>
-              <CardTitle>Catalogue de la bibliothèque</CardTitle>
-              <CardDescription>
-                Recherchez parmi divers ouvrages spécialisés en ingénierie, eau et environnement
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-                <div className="relative">
-                  <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                  <Input
-                    placeholder="Rechercher par titre, auteur, spécialisation..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="pl-10"
-                  />
+          <div className="space-y-6">
+            {/* Filtres */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg">Rechercher des livres</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                  <div className="relative">
+                    <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                    <Input
+                      placeholder="Rechercher par titre, auteur..."
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      className="pl-10"
+                    />
+                  </div>
+                  <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Toutes les catégories" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Toutes les catégories</SelectItem>
+                      {categories.map((category) => (
+                        <SelectItem key={category} value={category}>
+                          {category}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Select value={locationFilter} onValueChange={setLocationFilter}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Toutes les localisations" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Toutes les localisations</SelectItem>
+                      {locations.map((location) => (
+                        <SelectItem key={location.value} value={location.value}>
+                          {location.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <div className="text-sm text-gray-600 flex items-center">
+                    {filteredBooks.length} livre(s) trouvé(s)
+                  </div>
                 </div>
-                <Select value={genreFilter} onValueChange={setGenreFilter}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Spécialisation" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Toutes spécialisations</SelectItem>
-                    {specializations.map((spec) => (
-                      <SelectItem key={spec} value={spec}>
-                        {spec}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <Select value={locationFilter} onValueChange={setLocationFilter}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Bibliothèque" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Toutes bibliothèques</SelectItem>
-                    {locations.map((location) => (
-                      <SelectItem key={location.value} value={location.value}>
-                        {location.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <Select value={docTypeFilter} onValueChange={setDocTypeFilter}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Type de document" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Tous types</SelectItem>
-                    {documentTypes.map((type) => (
-                      <SelectItem key={type.value} value={type.value}>
-                        {type.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+              </CardContent>
+            </Card>
 
-              {/* Liste des livres */}
-              <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {filteredBooks.map((book) => (
-                  <Card key={book.id} className="overflow-hidden hover:shadow-lg transition-shadow">
-                    <div className="aspect-[3/4] bg-gray-100 relative">
-                      <img
-                        src={book.coverUrl || "/placeholder.svg"}
-                        alt={book.title}
-                        className="w-full h-full object-cover"
-                      />
-                      <div className="absolute top-2 right-2">{getDocumentTypeIcon(book.documentType)}</div>
+            {/* Liste des livres */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {filteredBooks.map((book) => (
+                <Card key={book.id} className="hover:shadow-lg transition-shadow">
+                  <CardHeader>
+                    <div className="flex justify-between items-start">
+                      <div className="flex-1">
+                        <CardTitle className="text-lg line-clamp-2">{book.title}</CardTitle>
+                        <CardDescription className="mt-1">par {book.author}</CardDescription>
+                      </div>
                     </div>
-                    <CardContent className="p-4">
-                      <h3 className="font-semibold text-lg mb-1 line-clamp-2">{book.title}</h3>
-                      <p className="text-gray-600 text-sm mb-2">{book.author}</p>
-                      <div className="flex items-center justify-between mb-2">
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-3">
+                      {book.category && (
                         <Badge variant="secondary" className="text-xs">
-                          {book.specialization}
+                          {book.category}
                         </Badge>
-                        <div className="flex items-center space-x-1">
-                          <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
-                          <span className="text-sm">{book.rating}</span>
-                        </div>
+                      )}
+                      
+                      <div className="flex items-center text-sm text-gray-600">
+                        <MapPin className="h-4 w-4 mr-1" />
+                        {getLocationLabel(book.location)}
                       </div>
-                      <div className="flex items-center space-x-2 mb-3">
-                        <Badge variant="outline" className="text-xs">
-                          {getDocumentTypeLabel(book.documentType)}
-                        </Badge>
-                        <div className="flex items-center space-x-1">
-                          <MapPin className="h-3 w-3 text-gray-400" />
-                          <span className="text-xs text-gray-600">{getLocationLabel(book.location)}</span>
-                        </div>
-                      </div>
-                      <p className="text-sm text-gray-600 mb-3 line-clamp-2">{book.description}</p>
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm text-gray-600">
-                          {book.availableCopies}/{book.totalCopies} disponible(s)
+
+                      <div className="text-sm">
+                        <span className={`font-medium ${isBookAvailable(book) ? "text-green-600" : "text-red-600"}`}>
+                          {book.available_copies} exemplaire(s) disponible(s)
                         </span>
+                        <span className="text-gray-500"> sur {book.total_copies}</span>
+                      </div>
+
+                      {book.description && (
+                        <p className="text-sm text-gray-600 line-clamp-2">{book.description}</p>
+                      )}
+
+                      <div className="pt-2">
+                        {hasUserBorrowedBook(book.id) ? (
+                          <Badge variant="outline">Déjà emprunté</Badge>
+                        ) : (
+                          <Button
+                            onClick={() => handleBorrowBook(book.id)}
+                            disabled={!isBookAvailable(book) || borrowingBook === book.id}
+                            className="w-full"
+                            size="sm"
+                          >
+                            {borrowingBook === book.id ? (
+                              <>
+                                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                Emprunt...
+                              </>
+                            ) : (
+                              <>
+                                <BookOpen className="h-4 w-4 mr-2" />
+                                {isBookAvailable(book) ? "Emprunter" : "Non disponible"}
+                              </>
+                            )}
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+
+            {filteredBooks.length === 0 && (
+              <Card>
+                <CardContent className="text-center py-8">
+                  <BookOpen className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                  <p className="text-gray-600">Aucun livre trouvé avec ces critères.</p>
+                </CardContent>
+              </Card>
+            )}
+          </div>
+        )}
+
+        {activeTab === "emprunts" && (
+          <div className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Mes emprunts en cours</CardTitle>
+                <CardDescription>
+                  Vous avez {loans.filter(l => l.status === "active").length} emprunt(s) en cours
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {loans.filter(l => l.status === "active").map((loan) => (
+                    <div key={loan.id} className="flex items-center justify-between p-4 border rounded-lg">
+                      <div className="flex-1">
+                        <h4 className="font-medium">{loan.book_title || `Livre ID: ${loan.book_id}`}</h4>
+                        {loan.book_author && (
+                          <p className="text-sm text-gray-600">par {loan.book_author}</p>
+                        )}
+                        <div className="flex items-center space-x-4 mt-2 text-sm text-gray-600">
+                          <div className="flex items-center">
+                            <Calendar className="h-4 w-4 mr-1" />
+                            Emprunté le {new Date(loan.loan_date).toLocaleDateString("fr-FR")}
+                          </div>
+                          <div className="flex items-center">
+                            <Calendar className="h-4 w-4 mr-1" />
+                            À rendre le {new Date(loan.due_date).toLocaleDateString("fr-FR")}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        {getStatusBadge(loan.status)}
                         <Button
+                          variant="outline"
                           size="sm"
-                          disabled={!book.available || book.availableCopies === 0}
-                          onClick={() => handleBorrowBook(book.id)}
-                          className="bg-green-600 hover:bg-green-700"
+                          onClick={() => handleReturnBook(loan.id)}
+                          disabled={returningLoan === loan.id}
                         >
-                          {book.available && book.availableCopies > 0 ? "Emprunter" : "Indisponible"}
+                          {returningLoan === loan.id ? (
+                            <>
+                              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                              Retour...
+                            </>
+                          ) : (
+                            "Retourner"
+                          )}
                         </Button>
                       </div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
+                    </div>
+                  ))}
 
-              {filteredBooks.length === 0 && (
-                <div className="text-center py-8">
-                  <BookOpen className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                  <p className="text-gray-500">Aucun ouvrage trouvé pour votre recherche.</p>
-                  <p className="text-sm text-gray-400 mt-2">
-                    Essayez de modifier vos critères de recherche ou contactez le CDI.
-                  </p>
+                  {loans.filter(l => l.status === "active").length === 0 && (
+                    <div className="text-center py-8">
+                      <BookOpen className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                      <p className="text-gray-600">Aucun emprunt en cours.</p>
+                      <p className="text-sm text-gray-500 mt-2">
+                        Parcourez le catalogue pour emprunter des livres.
+                      </p>
+                    </div>
+                  )}
                 </div>
-              )}
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+
+            {/* Historique des emprunts */}
+            {loans.filter(l => l.status === "returned").length > 0 && (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Historique des emprunts</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-3">
+                    {loans.filter(l => l.status === "returned").slice(0, 5).map((loan) => (
+                      <div key={loan.id} className="flex items-center justify-between p-3 border rounded">
+                        <div>
+                          <h5 className="font-medium text-sm">{loan.book_title || `Livre ID: ${loan.book_id}`}</h5>
+                          <p className="text-xs text-gray-600">
+                            Emprunté le {new Date(loan.loan_date).toLocaleDateString("fr-FR")}
+                            {loan.return_date && ` - Retourné le ${new Date(loan.return_date).toLocaleDateString("fr-FR")}`}
+                          </p>
+                        </div>
+                        {getStatusBadge(loan.status)}
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+          </div>
         )}
-      </main>
-
-      {/* Dialog pour noter un livre */}
-      <Dialog open={isRatingDialogOpen} onOpenChange={setIsRatingDialogOpen}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Noter ce livre</DialogTitle>
-            <DialogDescription>{selectedBook && `Donnez votre avis sur "${selectedBook.title}"`}</DialogDescription>
-          </DialogHeader>
-          {selectedBook && (
-            <div className="space-y-4">
-              <div className="flex items-center space-x-4">
-                <img
-                  src={selectedBook.coverUrl || "/placeholder.svg"}
-                  alt={selectedBook.title}
-                  className="w-16 h-20 object-cover rounded"
-                />
-                <div>
-                  <h4 className="font-medium">{selectedBook.title}</h4>
-                  <p className="text-sm text-gray-600">{selectedBook.author}</p>
-                  <Badge variant="secondary" className="text-xs mt-1">
-                    {selectedBook.specialization}
-                  </Badge>
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label>Votre note</Label>
-                {renderStars(rating, setRating)}
-                <p className="text-sm text-gray-600">Cliquez sur les étoiles pour noter</p>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="comment">Votre commentaire (optionnel)</Label>
-                <Textarea
-                  id="comment"
-                  placeholder="Partagez votre avis sur ce livre..."
-                  value={comment}
-                  onChange={(e) => setComment(e.target.value)}
-                  rows={3}
-                />
-              </div>
-
-              <div className="flex justify-end space-x-2">
-                <Button variant="outline" onClick={() => setIsRatingDialogOpen(false)}>
-                  Annuler
-                </Button>
-                <Button onClick={submitRating} className="bg-yellow-500 hover:bg-yellow-600">
-                  Valider ma note
-                </Button>
-              </div>
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
+      </div>
     </div>
   )
 }
