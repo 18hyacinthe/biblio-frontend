@@ -9,7 +9,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { useAuth } from "@/lib/auth-context"
-import { BookOpen, Mail, Lock, User, IdCard, GraduationCap, AlertCircle } from "lucide-react"
+import { BookOpen, Mail, Lock, User, IdCard, GraduationCap, AlertCircle, Eye, EyeOff } from "lucide-react"
+import Image from "next/image"
 
 export default function AuthPage() {
   const [isLoading, setIsLoading] = useState(false)
@@ -17,6 +18,8 @@ export default function AuthPage() {
   const [loginError, setLoginError] = useState("")
   const [registerError, setRegisterError] = useState("")
   const [registerSuccess, setRegisterSuccess] = useState("")
+  const [showLoginPassword, setShowLoginPassword] = useState(false)
+  const [showRegisterPassword, setShowRegisterPassword] = useState(false)
   const { login, register, user } = useAuth()
   const router = useRouter()
 
@@ -145,8 +148,14 @@ export default function AuthPage() {
       <div className="w-full max-w-md">
         {/* Logo et titre */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 bg-blue-600 rounded-full mb-4">
-            <BookOpen className="h-8 w-8 text-white" />
+          <div className="inline-flex items-center justify-center w-20 h-20 bg-white rounded-full mb-4 shadow-lg">
+            <Image 
+              src="/images/images.png" 
+              alt="Logo Bibliothèque 2iE" 
+              width={64} 
+              height={64}
+              className="rounded-full object-contain"
+            />
           </div>
           <h1 className="text-3xl font-bold text-gray-900">Bibliothèque 2iE</h1>
           <p className="text-gray-600 mt-2">Système de gestion des emprunts</p>
@@ -202,9 +211,9 @@ export default function AuthPage() {
                       <Lock className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
                       <Input
                         id="login-password"
-                        type="password"
+                        type={showLoginPassword ? "text" : "password"}
                         placeholder="••••••••"
-                        className="pl-10"
+                        className="pl-10 pr-10"
                         value={loginData.password}
                         onChange={(e) => {
                           setLoginData(prev => ({ ...prev, password: e.target.value }))
@@ -212,6 +221,17 @@ export default function AuthPage() {
                         }}
                         required
                       />
+                      <button
+                        type="button"
+                        className="absolute right-3 top-3 text-gray-400 hover:text-gray-600"
+                        onClick={() => setShowLoginPassword(!showLoginPassword)}
+                      >
+                        {showLoginPassword ? (
+                          <EyeOff className="h-4 w-4" />
+                        ) : (
+                          <Eye className="h-4 w-4" />
+                        )}
+                      </button>
                     </div>
                   </div>
 
@@ -296,13 +316,24 @@ export default function AuthPage() {
                       <Lock className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
                       <Input
                         id="register-password"
-                        type="password"
+                        type={showRegisterPassword ? "text" : "password"}
                         placeholder="••••••••"
-                        className="pl-10"
+                        className="pl-10 pr-10"
                         value={registerData.password}
                         onChange={(e) => setRegisterData(prev => ({ ...prev, password: e.target.value }))}
                         required
                       />
+                      <button
+                        type="button"
+                        className="absolute right-3 top-3 text-gray-400 hover:text-gray-600"
+                        onClick={() => setShowRegisterPassword(!showRegisterPassword)}
+                      >
+                        {showRegisterPassword ? (
+                          <EyeOff className="h-4 w-4" />
+                        ) : (
+                          <Eye className="h-4 w-4" />
+                        )}
+                      </button>
                     </div>
                   </div>
 

@@ -40,7 +40,7 @@ export default function Page() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-3">
-              <img src="/chemin/vers/votre/logo.png" alt="Logo Bibliothèque" className="h-16" />
+              <img src="/images/images.png" alt="Logo Bibliothèque" className="h-16" />
               <div>
                 <h1 className="text-2xl font-bold text-gray-900">Bibliothèque en ligne</h1>
                 <p className="text-sm text-gray-600">
@@ -180,11 +180,11 @@ export default function Page() {
             </div>
 
             {/* Image des deux bibliothèques */}
-            <div className="mb-6">
+            <div className="mb-6 flex justify-start">
               <img
-                src="/images/ma-nouvelle-image.jpg"
-                alt="Bibliothèques 2iE - Kamboinsé et Ouaga"
-                className="w-full rounded-lg shadow-md"
+              src="/images/images.png"
+              alt="Bibliothèques 2iE - Kamboinsé et Ouaga"
+              className="max-w-xs w-auto h-auto rounded-lg shadow-md object-cover"
               />
             </div>
 
