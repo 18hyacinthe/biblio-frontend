@@ -49,17 +49,14 @@ interface Book {
 
 interface Loan {
   id: string
-  user_id: string
-  book_id: string
-  loan_date: string
-  due_date: string
-  return_date?: string
+  bookId: string
+  bookTitle: string
+  bookAuthor: string
+  location: string
+  loanDate: string
+  dueDate: string
+  returnDate?: string
   status: "active" | "returned" | "overdue"
-  created_at?: string
-  updated_at?: string
-  // Informations du livre jointes
-  book_title?: string
-  book_author?: string
 }
 
 interface Review {
@@ -183,8 +180,11 @@ export default function StudentDashboard() {
         try {
           const review = await reviewsAPI.getByLoanId(loan.id)
           return { loanId: loan.id, review }
-        } catch (error) {
-          // Pas d'avis trouvé pour cet emprunt
+        } catch (error: any) {
+          // Pas d'avis trouvé pour cet emprunt - c'est normal, ne pas logger d'erreur
+          if (error.message !== "Aucun avis trouvé pour cet emprunt") {
+            console.error(`Erreur lors du chargement de l'avis pour l'emprunt ${loan.id}:`, error)
+          }
           return null
         }
       })
@@ -226,7 +226,7 @@ export default function StudentDashboard() {
         if (!loan) return
         
         // Le backend retourne bookId
-        const bookId = (loan as any).bookId || (loan as any).book_id
+        const bookId = loan.bookId
         
         if (!bookId) {
           console.error("❌ Aucun bookId trouvé dans le loan:", loan)
@@ -354,7 +354,7 @@ export default function StudentDashboard() {
   }
 
   const hasUserBorrowedBook = (bookId: string) => {
-    return loans.some(loan => loan.book_id === bookId && loan.status === "active")
+    return loans.some(loan => loan.bookId === bookId && loan.status === "active")
   }
 
   if (!user || user.role !== "student") {
@@ -497,15 +497,6 @@ export default function StudentDashboard() {
                 const imageUrl = book.coverUrl 
                   ? `${backendUrl}${book.coverUrl}?t=${Date.now()}`
                   : "/images/image-2iE.jpg"
-
-                // Debug: Log des informations du livre
-                console.log(`Livre ${book.title}:`, {
-                  availableCopies: book.availableCopies,
-                  totalCopies: book.totalCopies,
-                  status: book.status,
-                  isAvailable: isBookAvailable(book),
-                  hasUserBorrowed: hasUserBorrowedBook(book.id)
-                })
 
                 return (
                   <Card key={book.id} className="overflow-hidden hover:shadow-lg transition-shadow duration-200">
@@ -650,13 +641,13 @@ export default function StudentDashboard() {
                   {(showReviewForm || editingReview) && (
                     <ReviewForm
                       bookId={editingReview ? 
-                        loans.find(l => l.id === editingReview.loanId)?.book_id || "" :
-                        loans.find(l => l.id === showReviewForm)?.book_id || ""
+                        loans.find(l => l.id === editingReview.loanId)?.bookId || "" :
+                        loans.find(l => l.id === showReviewForm)?.bookId || ""
                       }
                       loanId={editingReview ? editingReview.loanId : showReviewForm || ""}
                       bookTitle={editingReview ?
-                        loans.find(l => l.id === editingReview.loanId)?.book_title || "" :
-                        loans.find(l => l.id === showReviewForm)?.book_title || ""
+                        loans.find(l => l.id === editingReview.loanId)?.bookTitle || "" :
+                        loans.find(l => l.id === showReviewForm)?.bookTitle || ""
                       }
                       onSubmit={handleSubmitReview}
                       onCancel={cancelReviewForm}
@@ -669,23 +660,22 @@ export default function StudentDashboard() {
                     const hasReview = loanReviews[loan.id]
                     const isShowingForm = showReviewForm === loan.id || editingReview?.loanId === loan.id
                     
-                    return (
-                      <Card key={loan.id} className="border border-gray-200">
+                    return (                        <Card key={loan.id} className="border border-gray-200">
                         <CardContent className="p-4">
                           <div className="flex items-start justify-between">
                             <div className="flex-1">
-                              <h4 className="font-medium">{loan.book_title || `Livre ID: ${loan.book_id}`}</h4>
-                              {loan.book_author && (
-                                <p className="text-sm text-gray-600">par {loan.book_author}</p>
+                              <h4 className="font-medium">{loan.bookTitle || `Livre ID: ${loan.bookId}`}</h4>
+                              {loan.bookAuthor && (
+                                <p className="text-sm text-gray-600">par {loan.bookAuthor}</p>
                               )}
                               <div className="flex items-center space-x-4 mt-2 text-sm text-gray-600">
                                 <div className="flex items-center">
                                   <Calendar className="h-4 w-4 mr-1" />
-                                  Emprunté le {new Date(loan.loan_date).toLocaleDateString("fr-FR")}
+                                  Emprunté le {new Date(loan.loanDate).toLocaleDateString("fr-FR")}
                                 </div>
                                 <div className="flex items-center">
                                   <Calendar className="h-4 w-4 mr-1" />
-                                  À rendre le {new Date(loan.due_date).toLocaleDateString("fr-FR")}
+                                  À rendre le {new Date(loan.dueDate).toLocaleDateString("fr-FR")}
                                 </div>
                               </div>
 
@@ -788,10 +778,10 @@ export default function StudentDashboard() {
                     {loans.filter(l => l.status === "returned").slice(0, 5).map((loan) => (
                       <div key={loan.id} className="flex items-center justify-between p-3 border rounded">
                         <div>
-                          <h5 className="font-medium text-sm">{loan.book_title || `Livre ID: ${loan.book_id}`}</h5>
+                          <h5 className="font-medium text-sm">{loan.bookTitle || `Livre ID: ${loan.bookId}`}</h5>
                           <p className="text-xs text-gray-600">
-                            Emprunté le {new Date(loan.loan_date).toLocaleDateString("fr-FR")}
-                            {loan.return_date && ` - Retourné le ${new Date(loan.return_date).toLocaleDateString("fr-FR")}`}
+                            Emprunté le {new Date(loan.loanDate).toLocaleDateString("fr-FR")}
+                            {loan.returnDate && ` - Retourné le ${new Date(loan.returnDate).toLocaleDateString("fr-FR")}`}
                           </p>
                         </div>
                         {getStatusBadge(loan.status)}

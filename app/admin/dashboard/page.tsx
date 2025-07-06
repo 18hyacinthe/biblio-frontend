@@ -56,19 +56,18 @@ interface Book {
 
 interface Loan {
   id: string
-  user_id: string
-  book_id: string
-  loan_date: string
-  due_date: string
-  return_date?: string
+  bookId: string
+  userId: string
+  loanDate: string
+  dueDate: string
+  returnDate?: string
   status: "active" | "returned" | "overdue"
-  created_at?: string
-  updated_at?: string
   // Informations du livre et utilisateur jointes
-  book_title?: string
-  book_author?: string
-  user_name?: string
-  user_email?: string
+  bookTitle?: string
+  bookAuthor?: string
+  userName?: string
+  userEmail?: string
+  studentId?: string
 }
 
 interface Reservation {
@@ -449,16 +448,6 @@ export default function AdminDashboard() {
               >
                 Emprunts ({stats.totalLoans})
               </button>
-              <button
-                onClick={() => setActiveTab("reservations")}
-                className={`py-2 px-1 border-b-2 font-medium text-sm ${
-                  activeTab === "reservations"
-                    ? "border-blue-500 text-blue-600"
-                    : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
-                }`}
-              >
-                Réservations ({stats.totalReservations})
-              </button>
             </nav>
           </div>
         </div>
@@ -521,7 +510,7 @@ export default function AdminDashboard() {
                 <CardDescription>Gérez votre bibliothèque efficacement</CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <Button onClick={() => router.push("/admin/books/add")} className="h-20">
                     <div className="text-center">
                       <Plus className="h-6 w-6 mx-auto mb-2" />
@@ -532,12 +521,6 @@ export default function AdminDashboard() {
                     <div className="text-center">
                       <FileText className="h-6 w-6 mx-auto mb-2" />
                       <span>Gérer les emprunts</span>
-                    </div>
-                  </Button>
-                  <Button variant="outline" onClick={() => setActiveTab("reservations")} className="h-20">
-                    <div className="text-center">
-                      <Calendar className="h-6 w-6 mx-auto mb-2" />
-                      <span>Gérer les réservations</span>
                     </div>
                   </Button>
                 </div>
@@ -556,10 +539,10 @@ export default function AdminDashboard() {
                     {loans.filter(l => l.status === "overdue").slice(0, 5).map((loan) => (
                       <div key={loan.id} className="flex items-center justify-between p-3 border rounded border-red-200 bg-red-50">
                         <div>
-                          <h5 className="font-medium text-sm">{loan.book_title || `Livre ID: ${loan.book_id}`}</h5>
+                          <h5 className="font-medium text-sm">{loan.bookTitle || `Livre ID: ${loan.bookId}`}</h5>
                           <p className="text-xs text-gray-600">
-                            Emprunté par {loan.user_name || loan.user_email || `Utilisateur ID: ${loan.user_id}`} - 
-                            À rendre le {new Date(loan.due_date).toLocaleDateString("fr-FR")}
+                            Emprunté par {loan.userName || loan.userEmail || `Utilisateur ID: ${loan.userId}`} - 
+                            À rendre le {new Date(loan.dueDate).toLocaleDateString("fr-FR")}
                           </p>
                         </div>
                         {getStatusBadge(loan.status)}
@@ -647,18 +630,18 @@ export default function AdminDashboard() {
                   {loans.filter(l => l.status === "active").map((loan) => (
                     <div key={loan.id} className="flex items-center justify-between p-4 border rounded-lg">
                       <div className="flex-1">
-                        <h4 className="font-medium">{loan.book_title || `Livre ID: ${loan.book_id}`}</h4>
+                        <h4 className="font-medium">{loan.bookTitle || `Livre ID: ${loan.bookId}`}</h4>
                         <p className="text-sm text-gray-600">
-                          Emprunté par {loan.user_name || loan.user_email || `Utilisateur ID: ${loan.user_id}`}
+                          Emprunté par {loan.userName || loan.userEmail || `Utilisateur ID: ${loan.userId}`}
                         </p>
                         <div className="flex items-center space-x-4 mt-2 text-sm text-gray-600">
                           <div className="flex items-center">
                             <Calendar className="h-4 w-4 mr-1" />
-                            {new Date(loan.loan_date).toLocaleDateString("fr-FR")}
+                            {new Date(loan.loanDate).toLocaleDateString("fr-FR")}
                           </div>
                           <div className="flex items-center">
                             <Clock className="h-4 w-4 mr-1" />
-                            À rendre le {new Date(loan.due_date).toLocaleDateString("fr-FR")}
+                            À rendre le {new Date(loan.dueDate).toLocaleDateString("fr-FR")}
                           </div>
                         </div>
                       </div>
