@@ -17,10 +17,16 @@ import {
   ArrowLeft,
   AlertCircle,
   Loader2,
+  Star,
+  MessageSquare,
+  Edit,
+  Trash2,
 } from "lucide-react"
 import { useAuth } from "@/lib/auth-context"
 import { useRouter } from "next/navigation"
-import { booksAPI, loansAPI } from "@/lib/api"
+import { booksAPI, loansAPI, reviewsAPI } from "@/lib/api"
+import { ReviewForm } from "@/components/review-form"
+import { ReviewsModal } from "@/components/reviews-modal"
 
 // Types
 interface Book {
@@ -54,6 +60,14 @@ interface Loan {
   // Informations du livre jointes
   book_title?: string
   book_author?: string
+}
+
+interface Review {
+  id: string
+  rating: number
+  comment: string
+  created_at: string
+  updated_at: string
 }
 
 const categories = [
@@ -92,6 +106,15 @@ export default function StudentDashboard() {
   const [borrowingBook, setBorrowingBook] = useState<string | null>(null)
   const [returningLoan, setReturningLoan] = useState<string | null>(null)
 
+  // États pour les reviews
+  const [showReviewForm, setShowReviewForm] = useState<string | null>(null)
+  const [editingReview, setEditingReview] = useState<{loanId: string, review: Review} | null>(null)
+  const [submittingReview, setSubmittingReview] = useState(false)
+  const [loanReviews, setLoanReviews] = useState<{[key: string]: Review}>({})
+  
+  // États pour la modal des avis
+  const [showReviewsModal, setShowReviewsModal] = useState<{bookId: string, bookTitle: string} | null>(null)
+
   // Vérification de l'utilisateur
   useEffect(() => {
     if (!user || user.role !== "student") {
@@ -104,6 +127,13 @@ export default function StudentDashboard() {
   useEffect(() => {
     loadData()
   }, [])
+
+  // Chargement des reviews pour les emprunts actifs
+  useEffect(() => {
+    if (loans.length > 0) {
+      loadLoanReviews()
+    }
+  }, [loans])
 
   // Filtrage des livres
   useEffect(() => {
@@ -146,13 +176,94 @@ export default function StudentDashboard() {
     }
   }
 
-  const handleLogout = () => {
-    logout()
-    router.push("/")
+  const loadLoanReviews = async () => {
+    try {
+      const activeLoans = loans.filter(l => l.status === "active")
+      const reviewPromises = activeLoans.map(async (loan) => {
+        try {
+          const review = await reviewsAPI.getByLoanId(loan.id)
+          return { loanId: loan.id, review }
+        } catch (error) {
+          // Pas d'avis trouvé pour cet emprunt
+          return null
+        }
+      })
+
+      const reviewsResults = await Promise.all(reviewPromises)
+      const reviewsMap: {[key: string]: Review} = {}
+      
+      reviewsResults.forEach(result => {
+        if (result) {
+          reviewsMap[result.loanId] = result.review
+        }
+      })
+      
+      setLoanReviews(reviewsMap)
+    } catch (error) {
+      console.error("Erreur lors du chargement des avis:", error)
+    }
   }
 
-  const handleGoHome = () => {
-    router.push("/")
+  const handleLogout = () => {
+    logout()
+    router.push("/auth")
+  }
+
+  // Fonctions pour les reviews
+  const handleSubmitReview = async (rating: number, comment: string) => {
+    if (!showReviewForm && !editingReview) return
+
+    try {
+      setSubmittingReview(true)
+      
+      if (editingReview) {
+        // Modifier un avis existant
+        await reviewsAPI.update(editingReview.review.id, rating, comment)
+        setEditingReview(null)
+      } else if (showReviewForm) {
+        // Créer un nouvel avis
+        const loan = loans.find(l => l.id === showReviewForm)
+        if (!loan) return
+        
+        // Le backend retourne bookId
+        const bookId = (loan as any).bookId || (loan as any).book_id
+        
+        if (!bookId) {
+          console.error("❌ Aucun bookId trouvé dans le loan:", loan)
+          setError("Erreur: ID du livre introuvable")
+          return
+        }
+        
+        await reviewsAPI.create(String(bookId), loan.id, rating, comment)
+        setShowReviewForm(null)
+      }
+      
+      // Recharger les avis
+      await loadLoanReviews()
+    } catch (error: any) {
+      console.error("Erreur lors de la soumission de l'avis:", error)
+      setError(error.message || "Erreur lors de la soumission de l'avis")
+    } finally {
+      setSubmittingReview(false)
+    }
+  }
+
+  const handleDeleteReview = async (reviewId: string, loanId: string) => {
+    try {
+      await reviewsAPI.delete(reviewId)
+      // Supprimer de l'état local
+      const newReviews = { ...loanReviews }
+      delete newReviews[loanId]
+      setLoanReviews(newReviews)
+    } catch (error: any) {
+      console.error("Erreur lors de la suppression de l'avis:", error)
+      setError(error.message || "Erreur lors de la suppression de l'avis")
+    }
+  }
+
+  const cancelReviewForm = () => {
+    setShowReviewForm(null)
+    setEditingReview(null)
   }
 
   const handleBorrowBook = async (bookId: string) => {
@@ -268,7 +379,7 @@ export default function StudentDashboard() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center py-4">
             <div className="flex items-center space-x-4">
-              <Button variant="ghost" size="sm" onClick={handleGoHome}>
+              <Button variant="ghost" size="sm" onClick={() => router.push("/")}>
                 <ArrowLeft className="h-4 w-4 mr-2" />
                 Accueil
               </Button>
@@ -465,7 +576,8 @@ export default function StudentDashboard() {
                           <p className="text-sm text-gray-600 line-clamp-2">{book.description}</p>
                         )}
 
-                        <div className="pt-2">
+                        <div className="pt-2 space-y-2">
+                          {/* Bouton principal (Emprunter ou Déjà emprunté) */}
                           {hasUserBorrowedBook(book.id) ? (
                             <Badge variant="outline" className="w-full justify-center py-2">
                               Déjà emprunté
@@ -493,6 +605,17 @@ export default function StudentDashboard() {
                               )}
                             </Button>
                           )}
+                          
+                          {/* Bouton pour voir les avis */}
+                          <Button
+                            variant="outline"
+                            onClick={() => setShowReviewsModal({bookId: book.id, bookTitle: book.title})}
+                            className="w-full"
+                            size="sm"
+                          >
+                            <MessageSquare className="h-4 w-4 mr-2" />
+                            Les avis
+                          </Button>
                         </div>
                       </div>
                     </CardContent>
@@ -523,44 +646,123 @@ export default function StudentDashboard() {
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  {loans.filter(l => l.status === "active").map((loan) => (
-                    <div key={loan.id} className="flex items-center justify-between p-4 border rounded-lg">
-                      <div className="flex-1">
-                        <h4 className="font-medium">{loan.book_title || `Livre ID: ${loan.book_id}`}</h4>
-                        {loan.book_author && (
-                          <p className="text-sm text-gray-600">par {loan.book_author}</p>
-                        )}
-                        <div className="flex items-center space-x-4 mt-2 text-sm text-gray-600">
-                          <div className="flex items-center">
-                            <Calendar className="h-4 w-4 mr-1" />
-                            Emprunté le {new Date(loan.loan_date).toLocaleDateString("fr-FR")}
+                  {/* Formulaire de review actif */}
+                  {(showReviewForm || editingReview) && (
+                    <ReviewForm
+                      bookId={editingReview ? 
+                        loans.find(l => l.id === editingReview.loanId)?.book_id || "" :
+                        loans.find(l => l.id === showReviewForm)?.book_id || ""
+                      }
+                      loanId={editingReview ? editingReview.loanId : showReviewForm || ""}
+                      bookTitle={editingReview ?
+                        loans.find(l => l.id === editingReview.loanId)?.book_title || "" :
+                        loans.find(l => l.id === showReviewForm)?.book_title || ""
+                      }
+                      onSubmit={handleSubmitReview}
+                      onCancel={cancelReviewForm}
+                      existingReview={editingReview?.review}
+                      isSubmitting={submittingReview}
+                    />
+                  )}
+
+                  {loans.filter(l => l.status === "active").map((loan) => {
+                    const hasReview = loanReviews[loan.id]
+                    const isShowingForm = showReviewForm === loan.id || editingReview?.loanId === loan.id
+                    
+                    return (
+                      <Card key={loan.id} className="border border-gray-200">
+                        <CardContent className="p-4">
+                          <div className="flex items-start justify-between">
+                            <div className="flex-1">
+                              <h4 className="font-medium">{loan.book_title || `Livre ID: ${loan.book_id}`}</h4>
+                              {loan.book_author && (
+                                <p className="text-sm text-gray-600">par {loan.book_author}</p>
+                              )}
+                              <div className="flex items-center space-x-4 mt-2 text-sm text-gray-600">
+                                <div className="flex items-center">
+                                  <Calendar className="h-4 w-4 mr-1" />
+                                  Emprunté le {new Date(loan.loan_date).toLocaleDateString("fr-FR")}
+                                </div>
+                                <div className="flex items-center">
+                                  <Calendar className="h-4 w-4 mr-1" />
+                                  À rendre le {new Date(loan.due_date).toLocaleDateString("fr-FR")}
+                                </div>
+                              </div>
+
+                              {/* Affichage de l'avis existant */}
+                              {hasReview && !isShowingForm && (
+                                <div className="mt-3 p-3 bg-gray-50 rounded-lg">
+                                  <div className="flex items-center justify-between mb-2">
+                                    <div className="flex items-center">
+                                      <Star className="h-4 w-4 text-yellow-500 mr-1" />
+                                      <span className="text-sm font-medium">Votre avis : {hasReview.rating}/5</span>
+                                    </div>
+                                    <div className="flex space-x-1">
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => setEditingReview({loanId: loan.id, review: hasReview})}
+                                        className="h-8 w-8 p-0"
+                                      >
+                                        <Edit className="h-3 w-3" />
+                                      </Button>
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => handleDeleteReview(hasReview.id, loan.id)}
+                                        className="h-8 w-8 p-0 text-red-600 hover:text-red-700"
+                                      >
+                                        <Trash2 className="h-3 w-3" />
+                                      </Button>
+                                    </div>
+                                  </div>
+                                  {hasReview.comment && (
+                                    <p className="text-sm text-gray-700">{hasReview.comment}</p>
+                                  )}
+                                  <p className="text-xs text-gray-500 mt-1">
+                                    {hasReview.updated_at !== hasReview.created_at ? "Modifié" : "Publié"} le{" "}
+                                    {new Date(hasReview.updated_at).toLocaleDateString("fr-FR")}
+                                  </p>
+                                </div>
+                              )}
+                            </div>
+                            
+                            <div className="flex items-center space-x-2 ml-4">
+                              {getStatusBadge(loan.status)}
+                              
+                              {/* Bouton pour donner un avis */}
+                              {!hasReview && !isShowingForm && (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => setShowReviewForm(loan.id)}
+                                >
+                                  <Star className="h-4 w-4 mr-1" />
+                                  Noter
+                                </Button>
+                              )}
+                              
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handleReturnBook(loan.id)}
+                                disabled={returningLoan === loan.id}
+                              >
+                                {returningLoan === loan.id ? (
+                                  <>
+                                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                    Retour...
+                                  </>
+                                ) : (
+                                  "Retourner"
+                                )}
+                              </Button>
+                            </div>
                           </div>
-                          <div className="flex items-center">
-                            <Calendar className="h-4 w-4 mr-1" />
-                            À rendre le {new Date(loan.due_date).toLocaleDateString("fr-FR")}
-                          </div>
-                        </div>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        {getStatusBadge(loan.status)}
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleReturnBook(loan.id)}
-                          disabled={returningLoan === loan.id}
-                        >
-                          {returningLoan === loan.id ? (
-                            <>
-                              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                              Retour...
-                            </>
-                          ) : (
-                            "Retourner"
-                          )}
-                        </Button>
-                      </div>
-                    </div>
-                  ))}
+                        </CardContent>
+                      </Card>
+                    )
+                  })}
 
                   {loans.filter(l => l.status === "active").length === 0 && (
                     <div className="text-center py-8">
@@ -602,6 +804,16 @@ export default function StudentDashboard() {
           </div>
         )}
       </div>
+
+      {/* Modal des avis */}
+      {showReviewsModal && (
+        <ReviewsModal
+          isOpen={true}
+          onClose={() => setShowReviewsModal(null)}
+          bookId={showReviewsModal.bookId}
+          bookTitle={showReviewsModal.bookTitle}
+        />
+      )}
     </div>
   )
 }

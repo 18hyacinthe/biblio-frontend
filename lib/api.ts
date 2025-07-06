@@ -220,10 +220,47 @@ export const searchAPI = {
   },
 };
 
+// Service des avis/reviews
+export const reviewsAPI = {
+  // Obtenir tous les avis d'un livre
+  getByBookId: async (bookId: string) => {
+    return await apiRequest(`/reviews/book/${bookId}`);
+  },
+
+  // Obtenir l'avis d'un utilisateur pour un emprunt
+  getByLoanId: async (loanId: string) => {
+    return await apiRequest(`/reviews/loan/${loanId}`);
+  },
+
+  // Créer un nouvel avis
+  create: async (bookId: string, loanId: string, rating: number, comment: string) => {
+    return await apiRequest('/reviews', {
+      method: 'POST',
+      body: JSON.stringify({ bookId, loanId, rating, comment }),
+    });
+  },
+
+  // Mettre à jour un avis
+  update: async (reviewId: string, rating: number, comment: string) => {
+    return await apiRequest(`/reviews/${reviewId}`, {
+      method: 'PUT',
+      body: JSON.stringify({ rating, comment }),
+    });
+  },
+
+  // Supprimer un avis
+  delete: async (reviewId: string) => {
+    return await apiRequest(`/reviews/${reviewId}`, {
+      method: 'DELETE',
+    });
+  },
+};
+
 export default {
   auth: authAPI,
   books: booksAPI,
   loans: loansAPI,
   reservations: reservationsAPI,
   search: searchAPI,
+  reviews: reviewsAPI,
 };
