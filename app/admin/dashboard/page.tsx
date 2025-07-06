@@ -17,6 +17,8 @@ import {
   Clock,
   Loader2,
   AlertCircle,
+  MapPin,
+  Copy,
 } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { useAuth } from "@/lib/auth-context"
@@ -35,6 +37,7 @@ interface Book {
   location: string
   total_copies: number
   available_copies: number
+  coverUrl?: string
   created_at?: string
   updated_at?: string
 }
@@ -69,6 +72,82 @@ interface Reservation {
   book_author?: string
   user_name?: string
   user_email?: string
+}
+
+// Composant BookCard pour l'affichage moderne des livres
+interface BookCardProps {
+  book: Book
+}
+
+const BookCard = ({ book }: BookCardProps) => {
+  const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:3001"
+  const [imageError, setImageError] = useState(false)
+  
+  const handleImageError = () => {
+    setImageError(true)
+  }
+  
+  return (
+    <Card className="overflow-hidden hover:shadow-lg transition-shadow duration-200">
+      <div className="aspect-[3/4] relative bg-gray-100">
+        <img
+          src={book.coverUrl && !imageError ? `${backendUrl}${book.coverUrl}` : "/images/image-2iE.jpg"}
+          alt={`Couverture de ${book.title}`}
+          className="w-full h-full object-cover"
+          onError={handleImageError}
+        />
+        
+        {/* Overlay avec le titre si on utilise l'image par défaut */}
+        {(!book.coverUrl || imageError) && (
+          <div className="absolute inset-0 bg-black bg-opacity-50 flex items-end">
+            <div className="p-3 text-white">
+              <p className="text-sm font-medium line-clamp-2">{book.title}</p>
+            </div>
+          </div>
+        )}
+        
+        {/* Badge de disponibilité */}
+        <div className="absolute top-2 right-2">
+          <Badge 
+            variant={book.available_copies > 0 ? "default" : "destructive"}
+            className="text-xs font-medium"
+          >
+            {book.available_copies > 0 ? "Disponible" : "Indisponible"}
+          </Badge>
+        </div>
+      </div>
+      
+      <CardContent className="p-4">
+        <div className="space-y-2">
+          <h3 className="font-semibold text-sm line-clamp-2 leading-tight">
+            {book.title}
+          </h3>
+          <p className="text-sm text-gray-600 line-clamp-1">
+            par {book.author}
+          </p>
+          
+          <div className="flex items-center justify-between text-xs text-gray-500">
+            <div className="flex items-center">
+              <Copy className="h-3 w-3 mr-1" />
+              <span>{book.available_copies}/{book.total_copies}</span>
+            </div>
+            {book.location && (
+              <div className="flex items-center">
+                <MapPin className="h-3 w-3 mr-1" />
+                <span className="line-clamp-1">{book.location}</span>
+              </div>
+            )}
+          </div>
+          
+          {book.category && (
+            <Badge variant="secondary" className="text-xs">
+              {book.category}
+            </Badge>
+          )}
+        </div>
+      </CardContent>
+    </Card>
+  )
 }
 
 export default function AdminDashboard() {
@@ -361,39 +440,51 @@ export default function AdminDashboard() {
 
         {activeTab === "books" && (
           <div className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Gestion des livres</CardTitle>
-                <CardDescription>
+            <div className="flex justify-between items-center">
+              <div>
+                <h2 className="text-2xl font-bold text-gray-900">Gestion des livres</h2>
+                <p className="text-gray-600">
                   {stats.totalBooks} livre(s) au total, {stats.availableBooks} disponible(s)
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {books.slice(0, 6).map((book) => (
-                    <div key={book.id} className="border rounded-lg p-4">
-                      <h4 className="font-medium line-clamp-1">{book.title}</h4>
-                      <p className="text-sm text-gray-600">par {book.author}</p>
-                      <div className="flex items-center justify-between mt-2">
-                        <span className={`text-sm ${book.available_copies > 0 ? "text-green-600" : "text-red-600"}`}>
-                          {book.available_copies}/{book.total_copies} disponibles
-                        </span>
-                        {book.category && (
-                          <Badge variant="secondary" className="text-xs">
-                            {book.category}
-                          </Badge>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-                {books.length > 6 && (
-                  <div className="text-center mt-4">
-                    <p className="text-sm text-gray-600">Et {books.length - 6} autres livres...</p>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
+                </p>
+              </div>
+              <Button onClick={() => router.push("/admin/books/add")}>
+                <Plus className="h-4 w-4 mr-2" />
+                Ajouter un livre
+              </Button>
+            </div>
+
+            {books.length === 0 ? (
+              <Card>
+                <CardContent className="text-center py-12">
+                  <BookOpen className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                  <h3 className="text-lg font-medium text-gray-900 mb-2">Aucun livre</h3>
+                  <p className="text-gray-600 mb-4">Commencez par ajouter votre premier livre à la bibliothèque.</p>
+                  <Button onClick={() => router.push("/admin/books/add")}>
+                    <Plus className="h-4 w-4 mr-2" />
+                    Ajouter un livre
+                  </Button>
+                </CardContent>
+              </Card>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6">
+                {books.slice(0, 20).map((book) => (
+                  <BookCard key={book.id} book={book} />
+                ))}
+              </div>
+            )}
+
+            {books.length > 20 && (
+              <Card>
+                <CardContent className="text-center py-6">
+                  <p className="text-sm text-gray-600 mb-4">
+                    Affichage des {Math.min(20, books.length)} premiers livres sur {books.length} au total.
+                  </p>
+                  <Button variant="outline" size="sm">
+                    Voir tous les livres
+                  </Button>
+                </CardContent>
+              </Card>
+            )}
           </div>
         )}
 

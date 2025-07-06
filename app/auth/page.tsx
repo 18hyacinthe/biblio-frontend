@@ -7,12 +7,16 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Alert, AlertDescription } from "@/components/ui/alert"
 import { useAuth } from "@/lib/auth-context"
-import { BookOpen, Mail, Lock, User, IdCard, GraduationCap } from "lucide-react"
+import { BookOpen, Mail, Lock, User, IdCard, GraduationCap, AlertCircle } from "lucide-react"
 
 export default function AuthPage() {
   const [isLoading, setIsLoading] = useState(false)
   const [activeTab, setActiveTab] = useState("login")
+  const [loginError, setLoginError] = useState("")
+  const [registerError, setRegisterError] = useState("")
+  const [registerSuccess, setRegisterSuccess] = useState("")
   const { login, register, user } = useAuth()
   const router = useRouter()
 
@@ -33,6 +37,15 @@ export default function AuthPage() {
     password: ""
   })
 
+  // Fonction pour gérer le changement d'onglet
+  const handleTabChange = (value: string) => {
+    setActiveTab(value)
+    // Réinitialiser les messages d'erreur et de succès lors du changement d'onglet
+    setLoginError("")
+    setRegisterError("")
+    setRegisterSuccess("")
+  }
+
   // États pour l'inscription
   const [registerData, setRegisterData] = useState({
     name: "",
@@ -45,12 +58,27 @@ export default function AuthPage() {
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsLoading(true)
+    setLoginError("") // Réinitialiser l'erreur
 
     try {
       await login(loginData.email, loginData.password)
       // La redirection sera gérée par l'useEffect basé sur le rôle de l'utilisateur
     } catch (error) {
       console.error("Erreur de connexion:", error)
+      const errorMessage = error instanceof Error ? error.message : "Erreur de connexion"
+      
+      // Messages d'erreur plus conviviaux
+      if (errorMessage.includes("Mot de passe incorrect")) {
+        setLoginError("Mot de passe incorrect. Veuillez vérifier vos informations.")
+      } else if (errorMessage.includes("Utilisateur non trouvé") || errorMessage.includes("User not found")) {
+        setLoginError("Adresse email non trouvée. Veuillez vérifier votre email ou vous inscrire.")
+      } else if (errorMessage.includes("Invalid credentials")) {
+        setLoginError("Identifiants invalides. Vérifiez votre email et mot de passe.")
+      } else if (errorMessage.includes("Network") || errorMessage.includes("fetch")) {
+        setLoginError("Problème de connexion au serveur. Veuillez réessayer.")
+      } else {
+        setLoginError(errorMessage || "Erreur de connexion. Veuillez réessayer.")
+      }
     } finally {
       setIsLoading(false)
     }
@@ -59,6 +87,8 @@ export default function AuthPage() {
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsLoading(true)
+    setRegisterError("") // Réinitialiser l'erreur
+    setRegisterSuccess("") // Réinitialiser le succès
 
     try {
       await register({
@@ -68,8 +98,10 @@ export default function AuthPage() {
         studentId: registerData.studentId,
         specialization: registerData.specialization
       })
-      // Rediriger vers la page de connexion après inscription réussie
-      alert("Inscription réussie ! Veuillez vous connecter.")
+      
+      // Afficher le message de succès
+      setRegisterSuccess("Inscription réussie ! Vous pouvez maintenant vous connecter.")
+      
       // Réinitialiser le formulaire et basculer vers l'onglet login
       setRegisterData({
         name: "",
@@ -78,10 +110,31 @@ export default function AuthPage() {
         studentId: "",
         specialization: ""
       })
-      // Basculer vers l'onglet login
-      setActiveTab("login")
+      
+      // Basculer vers l'onglet login après un délai
+      setTimeout(() => {
+        setActiveTab("login")
+        setRegisterSuccess("")
+      }, 2000)
+      
     } catch (error) {
       console.error("Erreur d'inscription:", error)
+      const errorMessage = error instanceof Error ? error.message : "Erreur d'inscription"
+      
+      // Messages d'erreur plus conviviaux
+      if (errorMessage.includes("Email already exists") || errorMessage.includes("déjà utilisé")) {
+        setRegisterError("Cette adresse email est déjà utilisée. Veuillez en choisir une autre ou vous connecter.")
+      } else if (errorMessage.includes("Invalid email")) {
+        setRegisterError("Format d'email invalide. Veuillez saisir un email valide.")
+      } else if (errorMessage.includes("Password too short")) {
+        setRegisterError("Le mot de passe doit contenir au moins 6 caractères.")
+      } else if (errorMessage.includes("Missing required fields")) {
+        setRegisterError("Veuillez remplir tous les champs obligatoires.")
+      } else if (errorMessage.includes("Network") || errorMessage.includes("fetch")) {
+        setRegisterError("Problème de connexion au serveur. Veuillez réessayer.")
+      } else {
+        setRegisterError(errorMessage || "Erreur lors de l'inscription. Veuillez réessayer.")
+      }
     } finally {
       setIsLoading(false)
     }
@@ -100,7 +153,7 @@ export default function AuthPage() {
         </div>
 
         <Card className="shadow-lg">
-          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+          <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
             <TabsList className="grid w-full grid-cols-2">
               <TabsTrigger value="login">Connexion</TabsTrigger>
               <TabsTrigger value="register">Inscription</TabsTrigger>
@@ -115,6 +168,14 @@ export default function AuthPage() {
                 </CardDescription>
               </CardHeader>
               <CardContent>
+                {/* Affichage des erreurs de connexion */}
+                {loginError && (
+                  <Alert variant="destructive" className="mb-4">
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertDescription>{loginError}</AlertDescription>
+                  </Alert>
+                )}
+                
                 <form onSubmit={handleLogin} className="space-y-4">
                   <div className="space-y-2">
                     <Label htmlFor="login-email">Email</Label>
@@ -126,7 +187,10 @@ export default function AuthPage() {
                         placeholder="votre.email@student.2ie-edu.org"
                         className="pl-10"
                         value={loginData.email}
-                        onChange={(e) => setLoginData(prev => ({ ...prev, email: e.target.value }))}
+                        onChange={(e) => {
+                          setLoginData(prev => ({ ...prev, email: e.target.value }))
+                          if (loginError) setLoginError("") // Effacer l'erreur lors de la saisie
+                        }}
                         required
                       />
                     </div>
@@ -142,7 +206,10 @@ export default function AuthPage() {
                         placeholder="••••••••"
                         className="pl-10"
                         value={loginData.password}
-                        onChange={(e) => setLoginData(prev => ({ ...prev, password: e.target.value }))}
+                        onChange={(e) => {
+                          setLoginData(prev => ({ ...prev, password: e.target.value }))
+                          if (loginError) setLoginError("") // Effacer l'erreur lors de la saisie
+                        }}
                         required
                       />
                     </div>
@@ -168,6 +235,22 @@ export default function AuthPage() {
                 </CardDescription>
               </CardHeader>
               <CardContent>
+                {/* Affichage des erreurs d'inscription */}
+                {registerError && (
+                  <Alert variant="destructive" className="mb-4">
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertDescription>{registerError}</AlertDescription>
+                  </Alert>
+                )}
+                
+                {/* Affichage du message de succès */}
+                {registerSuccess && (
+                  <Alert className="mb-4 border-green-200 bg-green-50">
+                    <AlertCircle className="h-4 w-4 text-green-600" />
+                    <AlertDescription className="text-green-700">{registerSuccess}</AlertDescription>
+                  </Alert>
+                )}
+                
                 <form onSubmit={handleRegister} className="space-y-4">
                   <div className="space-y-2">
                     <Label htmlFor="register-name">Nom complet</Label>
@@ -179,7 +262,10 @@ export default function AuthPage() {
                         placeholder="Jean Ouédraogo"
                         className="pl-10"
                         value={registerData.name}
-                        onChange={(e) => setRegisterData(prev => ({ ...prev, name: e.target.value }))}
+                        onChange={(e) => {
+                          setRegisterData(prev => ({ ...prev, name: e.target.value }))
+                          if (registerError) setRegisterError("") // Effacer l'erreur lors de la saisie
+                        }}
                         required
                       />
                     </div>
@@ -195,7 +281,10 @@ export default function AuthPage() {
                         placeholder="j.ouedraogo@student.2ie-edu.org"
                         className="pl-10"
                         value={registerData.email}
-                        onChange={(e) => setRegisterData(prev => ({ ...prev, email: e.target.value }))}
+                        onChange={(e) => {
+                          setRegisterData(prev => ({ ...prev, email: e.target.value }))
+                          if (registerError) setRegisterError("") // Effacer l'erreur lors de la saisie
+                        }}
                         required
                       />
                     </div>
