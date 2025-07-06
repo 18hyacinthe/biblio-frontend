@@ -104,15 +104,17 @@ export default function AdminDashboard() {
       setError("")
 
       // Charger toutes les données en parallèle
-      const [booksData, loansData, reservationsData] = await Promise.all([
+      const [booksResponse, loansResponse, reservationsResponse] = await Promise.all([
         booksAPI.getAll(),
         loansAPI.getAll(),
         reservationsAPI.getAll()
       ])
 
-      setBooks(booksData)
-      setLoans(loansData)
-      setReservations(reservationsData)
+      // Le backend retourne directement les arrays ou dans des propriétés spécifiques
+      setBooks(Array.isArray(booksResponse) ? booksResponse : booksResponse.books || [])
+      setLoans(Array.isArray(loansResponse) ? loansResponse : loansResponse.loans || [])
+      setReservations(Array.isArray(reservationsResponse) ? reservationsResponse : reservationsResponse.reservations || [])
+      
     } catch (error: any) {
       console.error("Erreur lors du chargement des données:", error)
       setError(error.message || "Erreur lors du chargement des données")
