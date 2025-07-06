@@ -35,6 +35,8 @@ interface Book {
   location: string
   total_copies: number
   available_copies: number
+  coverUrl?: string
+  status?: string
   created_at?: string
   updated_at?: string
 }
@@ -353,69 +355,110 @@ export default function StudentDashboard() {
             </Card>
 
             {/* Liste des livres */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {filteredBooks.map((book) => (
-                <Card key={book.id} className="hover:shadow-lg transition-shadow">
-                  <CardHeader>
-                    <div className="flex justify-between items-start">
-                      <div className="flex-1">
-                        <CardTitle className="text-lg line-clamp-2">{book.title}</CardTitle>
-                        <CardDescription className="mt-1">par {book.author}</CardDescription>
-                      </div>
-                    </div>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-3">
-                      {book.category && (
-                        <Badge variant="secondary" className="text-xs">
-                          {book.category}
-                        </Badge>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+              {filteredBooks.map((book) => {
+                const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:5000"
+                const imageUrl = book.coverUrl 
+                  ? `${backendUrl}${book.coverUrl}?t=${Date.now()}`
+                  : "/images/image-2iE.jpg"
+
+                return (
+                  <Card key={book.id} className="overflow-hidden hover:shadow-lg transition-shadow duration-200">
+                    {/* Image de couverture */}
+                    <div className="aspect-[3/4] relative bg-gray-100">
+                      <img 
+                        src={imageUrl}
+                        alt={`Couverture de ${book.title}`}
+                        className="w-full h-full object-cover"
+                        onError={(e) => {
+                          const target = e.target as HTMLImageElement
+                          target.src = "/images/image-2iE.jpg"
+                        }}
+                      />
+                      
+                      {/* Overlay avec le titre si on utilise l'image par défaut */}
+                      {!book.coverUrl && (
+                        <div className="absolute inset-0 bg-black bg-opacity-50 flex items-end">
+                          <div className="p-3 text-white">
+                            <p className="text-sm font-medium line-clamp-2">{book.title}</p>
+                          </div>
+                        </div>
                       )}
                       
-                      <div className="flex items-center text-sm text-gray-600">
-                        <MapPin className="h-4 w-4 mr-1" />
-                        {getLocationLabel(book.location)}
-                      </div>
-
-                      <div className="text-sm">
-                        <span className={`font-medium ${isBookAvailable(book) ? "text-green-600" : "text-red-600"}`}>
-                          {book.available_copies} exemplaire(s) disponible(s)
-                        </span>
-                        <span className="text-gray-500"> sur {book.total_copies}</span>
-                      </div>
-
-                      {book.description && (
-                        <p className="text-sm text-gray-600 line-clamp-2">{book.description}</p>
-                      )}
-
-                      <div className="pt-2">
-                        {hasUserBorrowedBook(book.id) ? (
-                          <Badge variant="outline">Déjà emprunté</Badge>
+                      {/* Badge de disponibilité */}
+                      <div className="absolute top-2 right-2">
+                        {book.available_copies > 0 ? (
+                          <Badge variant="default" className="text-xs">Disponible</Badge>
                         ) : (
-                          <Button
-                            onClick={() => handleBorrowBook(book.id)}
-                            disabled={!isBookAvailable(book) || borrowingBook === book.id}
-                            className="w-full"
-                            size="sm"
-                          >
-                            {borrowingBook === book.id ? (
-                              <>
-                                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                                Emprunt...
-                              </>
-                            ) : (
-                              <>
-                                <BookOpen className="h-4 w-4 mr-2" />
-                                {isBookAvailable(book) ? "Emprunter" : "Non disponible"}
-                              </>
-                            )}
-                          </Button>
+                          <Badge variant="destructive" className="text-xs">Indisponible</Badge>
                         )}
                       </div>
                     </div>
-                  </CardContent>
-                </Card>
-              ))}
+
+                    <CardContent className="p-4">
+                      <div className="space-y-3">
+                        <div>
+                          <h3 className="font-semibold text-lg line-clamp-2 leading-tight">
+                            {book.title}
+                          </h3>
+                          <p className="text-sm text-gray-600 line-clamp-1">
+                            par {book.author}
+                          </p>
+                        </div>
+                        
+                        {book.category && (
+                          <Badge variant="secondary" className="text-xs">
+                            {book.category}
+                          </Badge>
+                        )}
+                        
+                        <div className="flex items-center text-sm text-gray-600">
+                          <MapPin className="h-4 w-4 mr-1" />
+                          {getLocationLabel(book.location)}
+                        </div>
+
+                        <div className="text-sm">
+                          <span className={`font-medium ${isBookAvailable(book) ? "text-green-600" : "text-red-600"}`}>
+                            {book.available_copies} exemplaire(s) disponible(s)
+                          </span>
+                          <span className="text-gray-500"> sur {book.total_copies}</span>
+                        </div>
+
+                        {book.description && (
+                          <p className="text-sm text-gray-600 line-clamp-2">{book.description}</p>
+                        )}
+
+                        <div className="pt-2">
+                          {hasUserBorrowedBook(book.id) ? (
+                            <Badge variant="outline" className="w-full justify-center py-2">
+                              Déjà emprunté
+                            </Badge>
+                          ) : (
+                            <Button
+                              onClick={() => handleBorrowBook(book.id)}
+                              disabled={!isBookAvailable(book) || borrowingBook === book.id}
+                              className="w-full"
+                              size="sm"
+                            >
+                              {borrowingBook === book.id ? (
+                                <>
+                                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                  Emprunt...
+                                </>
+                              ) : (
+                                <>
+                                  <BookOpen className="h-4 w-4 mr-2" />
+                                  {isBookAvailable(book) ? "Emprunter" : "Non disponible"}
+                                </>
+                              )}
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )
+              })}
             </div>
 
             {filteredBooks.length === 0 && (
