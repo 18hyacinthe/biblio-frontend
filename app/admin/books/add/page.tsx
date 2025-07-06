@@ -30,6 +30,7 @@ export default function AddBookPage() {
     documentType: "",
     location: "",
     language: "Français",
+    status: "available",
   })
 
   // États pour la gestion de l'image
@@ -93,6 +94,7 @@ export default function AddBookPage() {
         publishedYear: formData.publishedYear ? parseInt(formData.publishedYear) : undefined,
         documentType: formData.documentType,
         language: formData.language,
+        status: formData.status,
         coverUrl: coverImageUrl
       }
 
@@ -116,6 +118,7 @@ export default function AddBookPage() {
           documentType: "",
           location: "",
           language: "Français",
+          status: "available",
         })
         
         // Réinitialiser l'image
@@ -330,6 +333,26 @@ export default function AddBookPage() {
                       ))}
                     </SelectContent>
                   </Select>
+                </div>
+              </div>
+
+              <div className="grid md:grid-cols-2 gap-6">
+                <div className="space-y-2">
+                  <Label htmlFor="status">Statut *</Label>
+                  <Select value={formData.status} onValueChange={(value) => handleInputChange("status", value)}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Sélectionner un statut" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="available">Disponible</SelectItem>
+                      <SelectItem value="unavailable">Indisponible</SelectItem>
+                      <SelectItem value="maintenance">En maintenance</SelectItem>
+                      <SelectItem value="reserved">Réservé</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  {/* Espace vide pour la symétrie */}
                 </div>
               </div>
 

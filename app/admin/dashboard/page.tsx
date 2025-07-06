@@ -39,6 +39,7 @@ interface Book {
   total_copies: number
   available_copies: number
   coverUrl?: string
+  status?: string
   created_at?: string
   updated_at?: string
 }
@@ -101,6 +102,28 @@ const BookCard = ({ book }: BookCardProps) => {
   
   console.log("BookCard - Image URL:", imageUrl, "Book:", book.title)
   
+  // Fonction pour obtenir le badge de statut
+  const getStatusBadge = (status?: string) => {
+    // Si pas de copies disponibles, toujours indisponible
+    if (book.available_copies <= 0) {
+      return <Badge variant="destructive" className="text-xs">Indisponible</Badge>
+    }
+    
+    // Sinon, utiliser le statut défini
+    switch (status) {
+      case "available":
+        return <Badge variant="default" className="text-xs">Disponible</Badge>
+      case "unavailable":
+        return <Badge variant="destructive" className="text-xs">Indisponible</Badge>
+      case "maintenance":
+        return <Badge variant="secondary" className="text-xs">Maintenance</Badge>
+      case "reserved":
+        return <Badge variant="outline" className="text-xs">Réservé</Badge>
+      default:
+        return <Badge variant="default" className="text-xs">Disponible</Badge>
+    }
+  }
+  
   return (
     <Card className="overflow-hidden hover:shadow-lg transition-shadow duration-200">
       <div className="aspect-[3/4] relative bg-gray-100">
@@ -121,14 +144,9 @@ const BookCard = ({ book }: BookCardProps) => {
           </div>
         )}
         
-        {/* Badge de disponibilité */}
+        {/* Badge de statut unifié */}
         <div className="absolute top-2 right-2">
-          <Badge 
-            variant={book.available_copies > 0 ? "default" : "destructive"}
-            className="text-xs font-medium"
-          >
-            {book.available_copies > 0 ? "Disponible" : "Indisponible"}
-          </Badge>
+          {getStatusBadge(book.status)}
         </div>
       </div>
       
