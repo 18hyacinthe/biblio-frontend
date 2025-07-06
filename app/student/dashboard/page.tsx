@@ -33,8 +33,8 @@ interface Book {
   description?: string
   category?: string
   location: string
-  total_copies: number
-  available_copies: number
+  totalCopies: number
+  availableCopies: number
   coverUrl?: string
   status?: string
   created_at?: string
@@ -214,7 +214,32 @@ export default function StudentDashboard() {
   }
 
   const isBookAvailable = (book: Book) => {
-    return book.available_copies > 0
+    // Un livre est disponible si :
+    // 1. Il a des copies disponibles ET
+    // 2. Son statut est "available"
+    return book.availableCopies > 0 && book.status === "available"
+  }
+
+  // Fonction pour obtenir le badge de statut du livre
+  const getBookStatusBadge = (book: Book) => {
+    // Si pas de copies disponibles, toujours indisponible
+    if (book.availableCopies <= 0) {
+      return <Badge variant="destructive" className="text-xs">Indisponible</Badge>
+    }
+    
+    // Sinon, utiliser le statut défini dans la DB
+    switch (book.status) {
+      case "available":
+        return <Badge variant="default" className="text-xs">Disponible</Badge>
+      case "unavailable":
+        return <Badge variant="destructive" className="text-xs">Indisponible</Badge>
+      case "maintenance":
+        return <Badge variant="secondary" className="text-xs">Maintenance</Badge>
+      case "reserved":
+        return <Badge variant="outline" className="text-xs">Réservé</Badge>
+      default:
+        return <Badge variant="default" className="text-xs">Disponible</Badge>
+    }
   }
 
   const hasUserBorrowedBook = (bookId: string) => {
@@ -362,6 +387,15 @@ export default function StudentDashboard() {
                   ? `${backendUrl}${book.coverUrl}?t=${Date.now()}`
                   : "/images/image-2iE.jpg"
 
+                // Debug: Log des informations du livre
+                console.log(`Livre ${book.title}:`, {
+                  availableCopies: book.availableCopies,
+                  totalCopies: book.totalCopies,
+                  status: book.status,
+                  isAvailable: isBookAvailable(book),
+                  hasUserBorrowed: hasUserBorrowedBook(book.id)
+                })
+
                 return (
                   <Card key={book.id} className="overflow-hidden hover:shadow-lg transition-shadow duration-200">
                     {/* Image de couverture */}
@@ -387,11 +421,7 @@ export default function StudentDashboard() {
                       
                       {/* Badge de disponibilité */}
                       <div className="absolute top-2 right-2">
-                        {book.available_copies > 0 ? (
-                          <Badge variant="default" className="text-xs">Disponible</Badge>
-                        ) : (
-                          <Badge variant="destructive" className="text-xs">Indisponible</Badge>
-                        )}
+                        {getBookStatusBadge(book)}
                       </div>
                     </div>
 
@@ -419,9 +449,16 @@ export default function StudentDashboard() {
 
                         <div className="text-sm">
                           <span className={`font-medium ${isBookAvailable(book) ? "text-green-600" : "text-red-600"}`}>
-                            {book.available_copies} exemplaire(s) disponible(s)
+                            {book.availableCopies} exemplaire(s) disponible(s)
                           </span>
-                          <span className="text-gray-500"> sur {book.total_copies}</span>
+                          <span className="text-gray-500"> sur {book.totalCopies}</span>
+                          {book.status && book.status !== "available" && (
+                            <div className="text-xs text-gray-500 mt-1">
+                              Statut: {book.status === "maintenance" ? "En maintenance" : 
+                                      book.status === "reserved" ? "Réservé" : 
+                                      book.status === "unavailable" ? "Indisponible" : book.status}
+                            </div>
+                          )}
                         </div>
 
                         {book.description && (
@@ -448,7 +485,10 @@ export default function StudentDashboard() {
                               ) : (
                                 <>
                                   <BookOpen className="h-4 w-4 mr-2" />
-                                  {isBookAvailable(book) ? "Emprunter" : "Non disponible"}
+                                  {isBookAvailable(book) ? "Emprunter" : 
+                                   book.status === "maintenance" ? "En maintenance" :
+                                   book.status === "reserved" ? "Réservé" :
+                                   book.availableCopies <= 0 ? "Non disponible" : "Indisponible"}
                                 </>
                               )}
                             </Button>
