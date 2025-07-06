@@ -6,6 +6,12 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import {
   BookOpen,
   Users,
   FileText,
@@ -20,6 +26,10 @@ import {
   MapPin,
   Copy,
   RefreshCw,
+  Eye,
+  Edit,
+  Trash2,
+  MoreVertical,
 } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { useAuth } from "@/lib/auth-context"
@@ -79,11 +89,14 @@ interface Reservation {
 // Composant BookCard pour l'affichage moderne des livres
 interface BookCardProps {
   book: Book
+  onUpdate?: () => void
 }
 
-const BookCard = ({ book }: BookCardProps) => {
+const BookCard = ({ book, onUpdate }: BookCardProps) => {
+  const router = useRouter()
   const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:5000"
   const [imageError, setImageError] = useState(false)
+  const [isDeleting, setIsDeleting] = useState(false)
   
   // Reset l'état d'erreur quand l'URL du livre change
   useEffect(() => {
@@ -123,6 +136,39 @@ const BookCard = ({ book }: BookCardProps) => {
         return <Badge variant="default" className="text-xs">Disponible</Badge>
     }
   }
+
+  // Fonction pour voir les détails du livre
+  const handleView = () => {
+    router.push(`/admin/books/${book.id}`)
+  }
+
+  // Fonction pour modifier le livre
+  const handleEdit = () => {
+    router.push(`/admin/books/${book.id}/edit`)
+  }
+
+  // Fonction pour supprimer le livre
+  const handleDelete = async () => {
+    if (!confirm(`Êtes-vous sûr de vouloir supprimer le livre "${book.title}" ?`)) {
+      return
+    }
+
+    setIsDeleting(true)
+    try {
+      const response = await booksAPI.delete(book.id)
+      if (response.success) {
+        alert("Livre supprimé avec succès !")
+        onUpdate?.() // Rafraîchir la liste
+      } else {
+        throw new Error(response.message || "Erreur lors de la suppression")
+      }
+    } catch (error: any) {
+      console.error("Erreur lors de la suppression:", error)
+      alert(`Erreur: ${error.message || "Impossible de supprimer le livre"}`)
+    } finally {
+      setIsDeleting(false)
+    }
+  }
   
   return (
     <Card className="overflow-hidden hover:shadow-lg transition-shadow duration-200">
@@ -147,6 +193,40 @@ const BookCard = ({ book }: BookCardProps) => {
         {/* Badge de statut unifié */}
         <div className="absolute top-2 right-2">
           {getStatusBadge(book.status)}
+        </div>
+
+        {/* Menu d'actions */}
+        <div className="absolute top-2 left-2 z-10">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button 
+                variant="secondary" 
+                size="sm" 
+                className="h-8 w-8 p-0 bg-white/90 hover:bg-white border border-gray-200 shadow-sm"
+                disabled={isDeleting}
+              >
+                <MoreVertical className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" className="w-40 z-50">
+              <DropdownMenuItem onClick={handleView} className="cursor-pointer">
+                <Eye className="h-4 w-4 mr-2" />
+                Voir détails
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={handleEdit} className="cursor-pointer">
+                <Edit className="h-4 w-4 mr-2" />
+                Modifier
+              </DropdownMenuItem>
+              <DropdownMenuItem 
+                onClick={handleDelete} 
+                className="cursor-pointer text-red-600 focus:text-red-600 focus:bg-red-50"
+                disabled={isDeleting}
+              >
+                <Trash2 className="h-4 w-4 mr-2" />
+                {isDeleting ? "Suppression..." : "Supprimer"}
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
       
@@ -533,7 +613,7 @@ export default function AdminDashboard() {
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6">
                 {books.slice(0, 20).map((book) => (
-                  <BookCard key={book.id} book={book} />
+                  <BookCard key={book.id} book={book} onUpdate={loadData} />
                 ))}
               </div>
             )}
