@@ -13,10 +13,12 @@ import { ArrowLeft } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { useAuth } from "@/lib/auth-context"
 import { specializations, documentTypes, locations } from "@/lib/data"
+import { booksAPI } from "@/lib/api"
 
 export default function AddBookPage() {
   const router = useRouter()
   const { user } = useAuth()
+  const [isLoading, setIsLoading] = useState(false)
   const [formData, setFormData] = useState({
     title: "",
     author: "",
@@ -36,13 +38,67 @@ export default function AddBookPage() {
     return null
   }
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    setIsLoading(true)
 
-    // Simulation d'ajout d'ouvrage
-    console.log("Nouvel ouvrage CDI 2iE:", formData)
-    alert("Ouvrage ajouté avec succès au catalogue !")
-    router.push("/admin/dashboard")
+    try {
+      // Validation des champs requis
+      if (!formData.title || !formData.author || !formData.specialization || !formData.totalCopies || !formData.documentType || !formData.location) {
+        alert("Veuillez remplir tous les champs obligatoires")
+        return
+      }
+
+      // Préparer les données pour l'API backend
+      const bookData = {
+        title: formData.title,
+        author: formData.author,
+        isbn: formData.isbn,
+        specialization: formData.specialization,
+        totalCopies: parseInt(formData.totalCopies),
+        location: formData.location,
+        description: formData.description,
+        publishedYear: formData.publishedYear ? parseInt(formData.publishedYear) : undefined,
+        documentType: formData.documentType,
+        language: formData.language,
+        coverUrl: formData.coverUrl
+      }
+
+      console.log("Données envoyées à l'API:", bookData)
+
+      // Appel de l'API pour créer le livre
+      const response = await booksAPI.create(bookData)
+      
+      if (response.success) {
+        alert("Ouvrage ajouté avec succès au catalogue !")
+        
+        // Réinitialiser le formulaire
+        setFormData({
+          title: "",
+          author: "",
+          specialization: "",
+          isbn: "",
+          publishedYear: "",
+          description: "",
+          totalCopies: "",
+          coverUrl: "",
+          documentType: "",
+          location: "",
+          language: "Français",
+        })
+        
+        // Rediriger vers le dashboard admin
+        router.push("/admin/dashboard")
+      } else {
+        throw new Error(response.message || "Erreur lors de l'ajout du livre")
+      }
+    } catch (error) {
+      console.error("Erreur lors de l'ajout du livre:", error)
+      const errorMessage = error instanceof Error ? error.message : "Impossible d'ajouter le livre"
+      alert(`Erreur: ${errorMessage}`)
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   const handleInputChange = (field: string, value: string) => {
@@ -227,8 +283,12 @@ export default function AddBookPage() {
                 <Button type="button" variant="outline" onClick={() => router.back()}>
                   Annuler
                 </Button>
-                <Button type="submit" className="bg-green-600 hover:bg-green-700">
-                  Ajouter l'ouvrage
+                <Button 
+                  type="submit" 
+                  className="bg-green-600 hover:bg-green-700"
+                  disabled={isLoading}
+                >
+                  {isLoading ? "Ajout en cours..." : "Ajouter l'ouvrage"}
                 </Button>
               </div>
             </form>
