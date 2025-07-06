@@ -4,6 +4,7 @@
 
 Plateforme web moderne de gestion de bibliothèque pour le Centre de Documentation et d'Information (CDI) de l'Institut International d'Ingénierie de l'Eau et de l'Environnement (2iE) au Burkina Faso. Cette application permet aux étudiants de rechercher, consulter et emprunter des ouvrages spécialisés en ingénierie, eau et environnement.
 
+
 ## 🏛️ À propos de 2iE
 
 L'Institut International d'Ingénierie de l'Eau et de l'Environnement (2iE) est une institution d'enseignement supérieur et de recherche basée au Burkina Faso, spécialisée dans la formation d'ingénieurs en :
