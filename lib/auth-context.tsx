@@ -50,12 +50,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const response = await authAPI.me()
       if (response.success && response.user) {
         setUser(response.user)
+        // Stocker le rôle dans localStorage pour la redirection
+        localStorage.setItem('userRole', response.user.role)
       } else {
         localStorage.removeItem('token')
+        localStorage.removeItem('userRole')
       }
     } catch (error) {
       console.error('Erreur vérification auth:', error)
       localStorage.removeItem('token')
+      localStorage.removeItem('userRole')
     } finally {
       setIsLoading(false)
     }
@@ -66,6 +70,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const response = await authAPI.login(email, password)
       if (response.success && response.user) {
         setUser(response.user)
+        // Stocker le rôle dans localStorage pour la redirection
+        localStorage.setItem('userRole', response.user.role)
       } else {
         throw new Error(response.message || 'Erreur de connexion')
       }
@@ -100,6 +106,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       console.error('Erreur déconnexion:', error)
     } finally {
       setUser(null)
+      localStorage.removeItem('userRole')
     }
   }
 

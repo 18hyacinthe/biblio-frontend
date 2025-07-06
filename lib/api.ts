@@ -99,7 +99,8 @@ export const booksAPI = {
     if (params?.limit) queryParams.append('limit', params.limit.toString());
 
     const endpoint = `/books${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
-    return await apiRequest(endpoint);
+    const response = await apiRequest(endpoint);
+    return response.books || [];
   },
 
   // Récupérer un livre par ID
@@ -143,7 +144,8 @@ export const booksAPI = {
 export const loansAPI = {
   // Récupérer mes emprunts
   getMy: async () => {
-    return await apiRequest('/loans/my');
+    const response = await apiRequest('/loans/my');
+    return response.loans || [];
   },
 
   // Récupérer tous les emprunts (admin)
@@ -154,7 +156,8 @@ export const loansAPI = {
     if (params?.limit) queryParams.append('limit', params.limit.toString());
 
     const endpoint = `/loans${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
-    return await apiRequest(endpoint);
+    const response = await apiRequest(endpoint);
+    return response.loans || [];
   },
 
   // Créer un emprunt

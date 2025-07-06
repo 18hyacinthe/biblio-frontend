@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -13,8 +13,19 @@ import { BookOpen, Mail, Lock, User, IdCard, GraduationCap } from "lucide-react"
 export default function AuthPage() {
   const [isLoading, setIsLoading] = useState(false)
   const [activeTab, setActiveTab] = useState("login")
-  const { login, register } = useAuth()
+  const { login, register, user } = useAuth()
   const router = useRouter()
+
+  // Effet pour rediriger l'utilisateur s'il est déjà connecté
+  useEffect(() => {
+    if (user) {
+      if (user.role === "admin") {
+        router.push("/admin/dashboard")
+      } else {
+        router.push("/student/dashboard")
+      }
+    }
+  }, [user, router])
 
   // États pour la connexion
   const [loginData, setLoginData] = useState({
@@ -37,7 +48,7 @@ export default function AuthPage() {
 
     try {
       await login(loginData.email, loginData.password)
-      router.push("/student/dashboard")
+      // La redirection sera gérée par l'useEffect basé sur le rôle de l'utilisateur
     } catch (error) {
       console.error("Erreur de connexion:", error)
     } finally {
