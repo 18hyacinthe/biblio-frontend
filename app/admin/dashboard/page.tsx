@@ -19,6 +19,7 @@ import {
   AlertCircle,
   MapPin,
   Copy,
+  RefreshCw,
 } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { useAuth } from "@/lib/auth-context"
@@ -80,21 +81,35 @@ interface BookCardProps {
 }
 
 const BookCard = ({ book }: BookCardProps) => {
-  const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:3001"
+  const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:5000"
   const [imageError, setImageError] = useState(false)
   
+  // Reset l'état d'erreur quand l'URL du livre change
+  useEffect(() => {
+    setImageError(false)
+  }, [book.coverUrl])
+  
   const handleImageError = () => {
+    console.log("Erreur de chargement pour l'image:", book.coverUrl)
     setImageError(true)
   }
+  
+  // Construire l'URL de l'image avec un timestamp pour éviter le cache
+  const imageUrl = book.coverUrl && !imageError 
+    ? `${backendUrl}${book.coverUrl}?t=${Date.now()}`
+    : "/images/image-2iE.jpg"
+  
+  console.log("BookCard - Image URL:", imageUrl, "Book:", book.title)
   
   return (
     <Card className="overflow-hidden hover:shadow-lg transition-shadow duration-200">
       <div className="aspect-[3/4] relative bg-gray-100">
         <img
-          src={book.coverUrl && !imageError ? `${backendUrl}${book.coverUrl}` : "/images/image-2iE.jpg"}
+          src={imageUrl}
           alt={`Couverture de ${book.title}`}
           className="w-full h-full object-cover"
           onError={handleImageError}
+          onLoad={() => console.log("Image chargée avec succès:", imageUrl)}
         />
         
         {/* Overlay avec le titre si on utilise l'image par défaut */}
@@ -175,6 +190,27 @@ export default function AdminDashboard() {
   // Chargement des données
   useEffect(() => {
     loadData()
+  }, [])
+
+  // Recharger les données quand on revient sur la page (focus)
+  useEffect(() => {
+    const handleFocus = () => {
+      console.log("Page regagne le focus, rechargement des données...")
+      loadData()
+    }
+
+    window.addEventListener('focus', handleFocus)
+    
+    // Recharger les données périodiquement (toutes les 30 secondes)
+    const interval = setInterval(() => {
+      console.log("Rechargement périodique des données...")
+      loadData()
+    }, 30000)
+
+    return () => {
+      window.removeEventListener('focus', handleFocus)
+      clearInterval(interval)
+    }
   }, [])
 
   const loadData = async () => {
@@ -447,10 +483,21 @@ export default function AdminDashboard() {
                   {stats.totalBooks} livre(s) au total, {stats.availableBooks} disponible(s)
                 </p>
               </div>
-              <Button onClick={() => router.push("/admin/books/add")}>
-                <Plus className="h-4 w-4 mr-2" />
-                Ajouter un livre
-              </Button>
+              <div className="flex space-x-2">
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={loadData}
+                  disabled={loading}
+                >
+                  <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+                  Actualiser
+                </Button>
+                <Button onClick={() => router.push("/admin/books/add")}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Ajouter un livre
+                </Button>
+              </div>
             </div>
 
             {books.length === 0 ? (
